@@ -3,22 +3,22 @@ import { Camera, Sparkles, BarChart2, ShieldCheck } from 'lucide-react';
 
 export function Navbar({ onOpenEvaluation, isBackendConnected, currentBoard, onSelectSample }) {
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
+    <header className="sticky top-0 z-40 bg-[#FFFBF0]/95 backdrop-blur-md border-b-2 border-ink shadow-retro-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
-        {/* Brand & Tagline */}
+        {/* Brand & Retro Banana Logo */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-            <Camera className="w-5 h-5 stroke-[2.2]" />
+          <div className="w-10 h-10 rounded-xl bg-banana-400 border-2 border-ink flex items-center justify-center text-ink shadow-retro-sm font-bold text-lg select-none">
+            🍌
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xl tracking-tight text-slate-900">BoardSnap</span>
-              <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                Banana Hacks 2026
+              <span className="font-extrabold text-2xl tracking-tight text-ink font-mono">BoardSnap</span>
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase px-2 py-0.5 rounded-md bg-banana-400 text-ink border-[1.5px] border-ink shadow-retro-sm">
+                Banana Hacks '26
               </span>
             </div>
-            <p className="text-xs text-slate-500 hidden sm:block">
+            <p className="text-xs text-ink-muted hidden sm:block font-medium">
               Snap a whiteboard. Get clean notes, redrawn diagram, and a quiz.
             </p>
           </div>
@@ -26,32 +26,31 @@ export function Navbar({ onOpenEvaluation, isBackendConnected, currentBoard, onS
 
         {/* Right Nav Actions */}
         <div className="flex items-center gap-3">
-          {/* Backend Connection Indicator */}
+          {/* Live vs Mock Mode Badge */}
           <div 
-            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold border-[1.5px] border-ink shadow-retro-sm ${
               isBackendConnected 
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                : 'bg-amber-50 text-amber-700 border-amber-200'
+                ? 'bg-vine-100 text-vine-600' 
+                : 'bg-banana-200 text-ink'
             }`}
-            title={isBackendConnected ? "Connected to Express + Vision Service" : "Client-side pipeline simulation active"}
           >
-            <span className={`w-2 h-2 rounded-full ${isBackendConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-            <span>{isBackendConnected ? 'Pipeline: Live API' : 'Pipeline: Demo Simulation'}</span>
+            <span className={`w-2 h-2 rounded-full border border-ink ${isBackendConnected ? 'bg-vine-500 animate-pulse' : 'bg-banana-500'}`} />
+            <span>{isBackendConnected ? 'API: LIVE' : 'API: READY'}</span>
           </div>
 
-          {/* Evaluation Numbers Modal Button */}
+          {/* Benchmark / Evaluation Modal Button */}
           <button
             onClick={onOpenEvaluation}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors border border-slate-200"
+            className="retro-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-banana-100 text-ink cursor-pointer"
           >
-            <BarChart2 className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="hidden sm:inline">Benchmark & Evaluation</span>
-            <span className="sm:hidden">Metrics</span>
+            <BarChart2 className="w-3.5 h-3.5 text-ink" />
+            <span className="hidden sm:inline">Benchmark & Metrics</span>
+            <span className="sm:hidden">40-Board Metrics</span>
           </button>
 
           {/* Team Tag */}
-          <div className="hidden lg:flex items-center gap-1 text-[11px] text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-200">
-            <span className="font-semibold text-slate-700">Team:</span> Ammar, Muavia, Moyeon, Awais
+          <div className="hidden lg:flex items-center gap-1 text-[11px] font-mono text-ink bg-banana-100 px-2.5 py-1 rounded-lg border-[1.5px] border-ink shadow-retro-sm">
+            <span className="font-bold">Team:</span> Ammar, Muavia, Moyeon, Awais
           </div>
         </div>
       </div>

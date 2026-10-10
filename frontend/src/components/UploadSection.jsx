@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Camera, Image as ImageIcon, AlertTriangle, ArrowRight, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Upload, Camera, Image as ImageIcon, AlertTriangle, ArrowRight, CheckCircle2, RefreshCw, Sparkles } from 'lucide-react';
 import { sampleBoards } from '../data/sampleBoards';
 
 export function UploadSection({ onProcessBoard, isProcessing }) {
@@ -91,53 +91,56 @@ export function UploadSection({ onProcessBoard, isProcessing }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 mb-8">
+    <div className="retro-card p-6 mb-8 bg-white">
+      {/* Hero Header */}
       <div className="max-w-3xl mx-auto text-center mb-6">
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Turn any messy whiteboard into study-ready notes
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-banana-300 border-[1.5px] border-ink shadow-retro-sm text-xs font-mono font-bold text-ink uppercase mb-3">
+          <span>🍌 Banana Hacks '26 Image AI Project</span>
+        </div>
+        <h2 className="text-3xl sm:text-4xl font-extrabold text-ink tracking-tight">
+          Turn any messy whiteboard into study notes.
         </h2>
-        <p className="mt-2 text-sm sm:text-base text-slate-600">
-          Clean perspective & glare &rarr; Detect handwriting & flowcharts &rarr; Generate notes, editable diagrams & quiz.
+        <p className="mt-2 text-sm sm:text-base text-ink-muted font-medium">
+          Fix perspective & glare &bull; Detect shapes & handwriting &bull; Redraw clean diagrams & quiz.
         </p>
       </div>
 
-      {/* Camera Capture Modal / Overlay */}
+      {/* Camera Capture Modal */}
       {cameraActive && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-2xl overflow-hidden max-w-2xl w-full border border-slate-700 shadow-2xl">
-            <div className="p-4 bg-slate-800 flex items-center justify-between text-white">
+          <div className="bg-white rounded-2xl overflow-hidden max-w-2xl w-full border-2 border-ink shadow-retro-lg">
+            <div className="p-4 bg-banana-300 border-b-2 border-ink flex items-center justify-between text-ink">
               <div className="flex items-center gap-2">
-                <Camera className="w-5 h-5 text-emerald-400" />
-                <span className="font-semibold text-sm">Align Whiteboard in Frame</span>
+                <Camera className="w-5 h-5 text-ink" />
+                <span className="font-bold text-sm font-mono">Camera: Align Whiteboard</span>
               </div>
-              <button onClick={stopCamera} className="text-xs px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600">
+              <button onClick={stopCamera} className="retro-btn text-xs px-2.5 py-1 rounded-md bg-white font-bold">
                 Cancel
               </button>
             </div>
             
             <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
               <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-              {/* Whiteboard alignment guide reticle */}
-              <div className="absolute inset-8 border-2 border-dashed border-emerald-400/60 rounded-xl pointer-events-none flex items-center justify-center">
-                <span className="text-xs text-emerald-300/80 bg-black/60 px-3 py-1 rounded-full">
-                  Keep edges of board within bounds
+              <div className="absolute inset-8 border-2 border-dashed border-banana-400 rounded-xl pointer-events-none flex items-center justify-center">
+                <span className="text-xs text-ink bg-banana-300 px-3 py-1 rounded-md font-mono font-bold border border-ink shadow-retro-sm">
+                  Keep board edges in frame
                 </span>
               </div>
             </div>
 
-            <div className="p-4 bg-slate-900 flex justify-center gap-4">
+            <div className="p-4 bg-cream-100 border-t-2 border-ink flex justify-center gap-4">
               <button
                 onClick={captureSnapshot}
-                className="px-6 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm shadow-lg shadow-emerald-500/30 flex items-center gap-2"
+                className="retro-btn px-6 py-2.5 rounded-xl bg-banana-400 hover:bg-banana-500 text-ink font-extrabold text-sm flex items-center gap-2"
               >
-                <Camera className="w-4 h-4" /> Snap Photo
+                <Camera className="w-4 h-4 text-ink" /> Snap Photo
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Main Upload Dropzone & Sample Row */}
+      {/* Main Grid: Upload Dropzone & Sample Picker */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         
         {/* Left: Drag Drop Area */}
@@ -150,8 +153,8 @@ export function UploadSection({ onProcessBoard, isProcessing }) {
             onClick={() => fileInputRef.current?.click()}
             className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 min-h-[220px] ${
               dragActive 
-                ? 'border-emerald-500 bg-emerald-50/50' 
-                : 'border-slate-300 hover:border-emerald-400 hover:bg-slate-50/50'
+                ? 'border-ink bg-banana-200' 
+                : 'border-ink/60 bg-cream-50 hover:bg-banana-100/60 hover:border-ink'
             }`}
           >
             <input
@@ -164,50 +167,50 @@ export function UploadSection({ onProcessBoard, isProcessing }) {
 
             {capturedImage ? (
               <div className="flex flex-col items-center">
-                <div className="relative w-40 h-24 rounded-lg overflow-hidden border border-slate-200 shadow-sm mb-3">
+                <div className="relative w-44 h-28 rounded-lg overflow-hidden border-2 border-ink shadow-retro-sm mb-3">
                   <img src={capturedImage} alt="Preview" className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded">
-                    Selected
+                  <span className="absolute bottom-1 right-1 bg-banana-400 text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 rounded border border-ink">
+                    SELECTED
                   </span>
                 </div>
-                <p className="text-xs font-semibold text-slate-800">
+                <p className="text-xs font-bold text-ink font-mono">
                   {selectedFile ? selectedFile.name : selectedSample?.name}
                 </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Click or drag another image to replace</p>
+                <p className="text-[11px] text-ink-muted mt-0.5">Click or drag another image to replace</p>
               </div>
             ) : (
               <>
-                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
-                  <Upload className="w-6 h-6" />
+                <div className="w-14 h-14 rounded-xl bg-banana-300 border-2 border-ink shadow-retro-sm text-ink flex items-center justify-center mb-3">
+                  <Upload className="w-6 h-6 stroke-[2.2]" />
                 </div>
-                <p className="text-sm font-bold text-slate-800">
-                  Drag & drop your whiteboard photo here
+                <p className="text-sm font-extrabold text-ink font-mono">
+                  Drop your whiteboard photo here
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-ink-muted mt-1 font-medium">
                   Supports JPG, PNG, WebP up to 25MB
                 </p>
               </>
             )}
           </div>
 
-          {/* Camera Trigger */}
+          {/* Action Row */}
           <div className="mt-3 flex items-center justify-between gap-3">
             <button
               onClick={(e) => { e.stopPropagation(); startCamera(); }}
-              className="flex-1 py-2.5 px-4 rounded-xl border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center justify-center gap-2 transition"
+              className="retro-btn flex-1 py-2.5 px-4 rounded-xl bg-white hover:bg-cream-100 text-ink font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Camera className="w-4 h-4 text-emerald-600" />
-              <span>Use Camera / Webcam</span>
+              <Camera className="w-4 h-4 text-ink" />
+              <span>Use Camera / Phone</span>
             </button>
 
             {/* Run Pipeline Button */}
             <button
               disabled={(!selectedFile && !selectedSample) || isProcessing}
               onClick={handleStartProcessing}
-              className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-md ${
+              className={`retro-btn flex-1 py-2.5 px-4 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition cursor-pointer ${
                 (!selectedFile && !selectedSample) || isProcessing
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/25'
+                  ? 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed shadow-none'
+                  : 'bg-banana-400 hover:bg-banana-500 text-ink'
               }`}
             >
               {isProcessing ? (
@@ -225,19 +228,19 @@ export function UploadSection({ onProcessBoard, isProcessing }) {
           </div>
         </div>
 
-        {/* Right: Quick Sample Boards from Benchmark */}
-        <div className="lg:col-span-5 bg-slate-50/70 border border-slate-200 rounded-xl p-4 flex flex-col justify-between">
+        {/* Right: Quick Benchmark Sample Cards */}
+        <div className="lg:col-span-5 bg-cream-200 border-2 border-ink rounded-xl p-4 flex flex-col justify-between shadow-retro-sm">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Or pick from test benchmark
+              <span className="text-xs font-mono font-bold text-ink uppercase tracking-wider">
+                Or test with sample boards
               </span>
-              <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-mono">
+              <span className="text-[10px] font-mono font-bold bg-white text-ink px-1.5 py-0.5 rounded border border-ink shadow-retro-sm">
                 40 boards
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 mb-3">
-              One-click test sample boards gathered by Ammar, Muavia, Moyeon, and Awais:
+            <p className="text-[11px] text-ink-muted mb-3 font-medium">
+              Click any photo to test the AI pipeline immediately:
             </p>
 
             <div className="space-y-2">
@@ -251,29 +254,29 @@ export function UploadSection({ onProcessBoard, isProcessing }) {
                       setSelectedFile(null);
                       setCapturedImage(sample.rawImageUrl);
                     }}
-                    className={`w-full text-left p-2.5 rounded-lg border text-xs transition-all flex items-start gap-2.5 ${
+                    className={`w-full text-left p-2.5 rounded-lg border-2 text-xs transition-all flex items-start gap-2.5 cursor-pointer ${
                       isSelected
-                        ? 'border-emerald-500 bg-emerald-50/80 shadow-sm'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        ? 'border-ink bg-banana-300 shadow-retro-sm'
+                        : 'border-ink/40 bg-white hover:border-ink hover:bg-banana-50'
                     }`}
                   >
-                    <div className="w-12 h-10 rounded overflow-hidden shrink-0 bg-slate-200 border border-slate-300">
+                    <div className="w-12 h-10 rounded overflow-hidden shrink-0 bg-slate-200 border border-ink">
                       <img src={sample.rawImageUrl} alt={sample.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-800 truncate">{sample.name}</span>
+                        <span className="font-bold text-ink truncate">{sample.name}</span>
                         {sample.isQualityPass ? (
-                          <span className="text-[10px] text-emerald-700 font-medium bg-emerald-100/80 px-1.5 py-0.2 rounded shrink-0">
-                            {(sample.quality * 100).toFixed(0)}% Q
+                          <span className="text-[10px] text-vine-600 font-mono font-bold bg-vine-100 px-1.5 py-0.2 rounded border border-ink shrink-0">
+                            {(sample.quality * 100).toFixed(0)}% PASS
                           </span>
                         ) : (
-                          <span className="text-[10px] text-rose-700 font-medium bg-rose-100/80 px-1.5 py-0.2 rounded shrink-0 flex items-center gap-0.5">
-                            <AlertTriangle className="w-2.5 h-2.5" /> Fail Case
+                          <span className="text-[10px] text-white font-mono font-bold bg-ripe px-1.5 py-0.2 rounded border border-ink shrink-0 flex items-center gap-0.5">
+                            <AlertTriangle className="w-2.5 h-2.5" /> REJECT TEST
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-slate-500 truncate mt-0.5">{sample.description}</p>
+                      <p className="text-[10px] text-ink-muted truncate mt-0.5 font-medium">{sample.description}</p>
                     </div>
                   </button>
                 );
@@ -281,8 +284,8 @@ export function UploadSection({ onProcessBoard, isProcessing }) {
             </div>
           </div>
 
-          <div className="mt-3 pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Tip: Try the "Glare/Fail" sample to see the Quality Gate retake flow!</span>
+          <div className="mt-3 pt-2 border-t border-ink/20 text-[11px] font-mono text-ink-muted">
+            <span>💡 Try the "Reject Test" to see our quality gate retake alert!</span>
           </div>
         </div>
 

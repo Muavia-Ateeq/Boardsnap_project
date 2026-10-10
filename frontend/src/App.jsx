@@ -62,7 +62,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-[#FFFDF5] text-ink flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
       {/* Top Navigation */}
       <Navbar
         onOpenEvaluation={() => setIsEvaluationOpen(true)}
@@ -143,23 +143,23 @@ export default function App() {
         onClose={() => setIsEvaluationOpen(false)}
       />
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-6 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      {/* Retro Banana Footer */}
+      <footer className="bg-[#FFFBF0] border-t-2 border-ink py-6 mt-12 shadow-retro-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-ink">
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-slate-900">BoardSnap</span>
+            <span className="font-extrabold text-base">🍌 BoardSnap</span>
             <span>&bull;</span>
-            <span>Banana Hacks 2026 Submission</span>
+            <span className="bg-banana-300 px-2 py-0.5 rounded border border-ink font-bold">Banana Hacks 2026</span>
           </div>
           <div>
-            Built with <Heart className="w-3.5 h-3.5 text-rose-500 inline fill-rose-500 mx-0.5" /> by <strong className="text-slate-700">Ammar, Muavia, Moyeon &amp; Awais</strong>
+            Built with 💛 by <strong className="font-extrabold">Ammar, Muavia, Moyeon &amp; Awais</strong>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsEvaluationOpen(true)}
-              className="text-emerald-700 hover:text-emerald-800 font-semibold underline underline-offset-2"
+              className="retro-btn bg-white hover:bg-banana-200 px-3 py-1 rounded text-ink font-bold cursor-pointer"
             >
-              40-Photo Evaluation Report
+              40-Photo Evaluation Table
             </button>
           </div>
         </div>

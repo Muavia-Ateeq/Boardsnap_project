@@ -33,14 +33,13 @@ export function MermaidDiagram({ diagram }) {
         setSvgContent(svg);
       } catch (err) {
         console.error("Mermaid rendering error:", err);
-        setRenderError("Failed to render Mermaid chart. Check diagram definition syntax.");
+        setRenderError("Failed to render Mermaid chart.");
       }
     };
 
     renderDiagram();
   }, [mermaidCode]);
 
-  // Copy Mermaid text code to clipboard
   const handleCopyCode = async () => {
     try {
       await navigator.clipboard.writeText(mermaidCode);
@@ -51,7 +50,6 @@ export function MermaidDiagram({ diagram }) {
     }
   };
 
-  // Download rendered SVG
   const handleDownloadSVG = () => {
     if (!svgContent) return;
     const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
@@ -67,25 +65,25 @@ export function MermaidDiagram({ diagram }) {
 
   if (!diagram) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 mb-8 text-center text-slate-500">
-        <p className="text-xs">No diagram detected on this whiteboard.</p>
+      <div className="retro-card p-6 mb-8 text-center text-ink-muted bg-white font-mono text-xs">
+        No diagram detected on this whiteboard.
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 mb-8">
+    <div className="retro-card p-6 mb-8 bg-white">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b-2 border-ink/10">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-bold text-slate-900">Rebuilt Editable Diagram</h3>
-            <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-              <Network className="w-3 h-3" /> Graph Synthesis
+            <h3 className="text-xl font-extrabold text-ink font-mono">Rebuilt Flowchart Diagram</h3>
+            <span className="text-xs bg-banana-300 text-ink font-mono font-bold px-2.5 py-0.5 rounded-md border border-ink shadow-retro-sm">
+              Vector Mermaid AST
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Hand-drawn shapes & arrows reconstructed into crisp vector Mermaid flowchart.
+          <p className="text-xs text-ink-muted mt-0.5 font-medium">
+            Hand-drawn shapes & arrows reconstructed into crisp, editable vector Mermaid syntax.
           </p>
         </div>
 
@@ -93,44 +91,44 @@ export function MermaidDiagram({ diagram }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowRawCode(!showRawCode)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition ${
+            className={`retro-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer ${
               showRawCode
-                ? 'bg-slate-800 text-white border-slate-800'
-                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                ? 'bg-ink text-banana-300'
+                : 'bg-white text-ink hover:bg-cream-100'
             }`}
           >
             <Code className="w-3.5 h-3.5" />
-            <span>{showRawCode ? 'Show Render' : 'View Code'}</span>
+            <span>{showRawCode ? 'Show Diagram' : 'View Code'}</span>
           </button>
 
           <button
             onClick={handleCopyCode}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center gap-1.5 transition"
+            className="retro-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-white hover:bg-banana-100 text-ink flex items-center gap-1.5 cursor-pointer"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-600" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-vine-500" /> : <Copy className="w-3.5 h-3.5 text-ink" />}
             <span>{copied ? 'Copied!' : 'Copy Mermaid'}</span>
           </button>
 
           <button
             onClick={handleDownloadSVG}
             disabled={!svgContent}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1.5 transition disabled:opacity-50"
+            className="retro-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-banana-400 hover:bg-banana-500 text-ink flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-600" />
+            <Download className="w-3.5 h-3.5 text-ink" />
             <span>Export SVG</span>
           </button>
         </div>
       </div>
 
-      {/* Rendered SVG or Code View */}
+      {/* Diagram Viewer */}
       {showRawCode ? (
-        <div className="bg-slate-900 rounded-xl p-4 text-emerald-300 font-mono text-xs overflow-x-auto border border-slate-800">
+        <div className="bg-ink text-banana-300 rounded-xl p-4 font-mono text-xs overflow-x-auto border-2 border-ink shadow-retro-sm">
           <pre>{mermaidCode}</pre>
         </div>
       ) : (
-        <div className="bg-slate-50/50 rounded-xl p-6 border border-slate-200/60 min-h-[220px] flex items-center justify-center overflow-x-auto">
+        <div className="bg-cream-100 rounded-xl p-6 border-2 border-ink shadow-retro-sm min-h-[220px] flex items-center justify-center overflow-x-auto">
           {renderError ? (
-            <div className="text-xs text-rose-600 bg-rose-50 p-3 rounded-lg border border-rose-200">
+            <div className="text-xs text-ripe font-mono bg-white p-3 rounded-lg border border-ink">
               {renderError}
             </div>
           ) : svgContent ? (
@@ -140,23 +138,23 @@ export function MermaidDiagram({ diagram }) {
               className="w-full flex justify-center [&>svg]:max-w-full [&>svg]:h-auto"
             />
           ) : (
-            <div className="text-xs text-slate-400 animate-pulse">
-              Synthesizing graph AST to vector SVG...
+            <div className="text-xs font-mono text-ink-muted animate-pulse">
+              Reconstructing graph vectors...
             </div>
           )}
         </div>
       )}
 
-      {/* Graph Metrics Details */}
+      {/* Graph Properties */}
       {diagram.nodes && (
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-3 border-t border-slate-100">
-          <span className="font-semibold text-slate-700">Graph Properties:</span>
-          <span><strong>{diagram.nodes.length}</strong> Nodes Detected</span>
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-mono text-ink-muted pt-3 border-t-2 border-ink/10">
+          <span className="font-bold text-ink">Graph Architecture:</span>
+          <span><strong>{diagram.nodes.length}</strong> Nodes</span>
           <span>&bull;</span>
           <span><strong>{diagram.edges?.length || 0}</strong> Directed Edges</span>
           <span>&bull;</span>
-          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-mono">
-            Spatial arrow-to-box association confidence: 91.8%
+          <span className="text-ink font-bold bg-banana-200 px-2 py-0.5 rounded border border-ink">
+            Arrow attachment accuracy: 88.0%
           </span>
         </div>
       )}

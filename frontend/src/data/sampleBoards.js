@@ -9,8 +9,8 @@ export const sampleBoards = [
     description: "CS class whiteboard with microservice architecture flowchart and bullet notes",
     quality: 0.88,
     isQualityPass: true,
-    rawImageUrl: "https://images.unsplash.com/photo-1572944608499-59368546059d?auto=format&fit=crop&w=1200&q=80",
-    cleanImageUrl: "https://images.unsplash.com/photo-1572944608499-59368546059d?auto=format&fit=crop&w=1200&q=80",
+     rawImageUrl: "https://images.unsplash.com/photo-1769731738826-a51acd5bddc7?auto=format&fit=crop&w=1200&q=80",
+    cleanImageUrl: "https://images.unsplash.com/photo-1769731738826-a51acd5bddc7?auto=format&fit=crop&w=1200&q=80",
     metrics: {
       perspectiveCorrection: "Rectified (-14° skew)",
       contrastBoost: "+42%",

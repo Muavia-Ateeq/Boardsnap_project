@@ -1,0 +1,169 @@
+import React, { useState, useEffect } from 'react';
+import { Navbar } from './components/Navbar';
+import { UploadSection } from './components/UploadSection';
+import { ProcessingPipeline } from './components/ProcessingPipeline';
+import { QualityRejectModal } from './components/QualityRejectModal';
+import { ImageComparison } from './components/ImageComparison';
+import { MermaidDiagram } from './components/MermaidDiagram';
+import { StructuredNotes } from './components/StructuredNotes';
+import { QuizSection } from './components/QuizSection';
+import { RAGChatSection } from './components/RAGChatSection';
+import { EvaluationModal } from './components/EvaluationModal';
+import { sampleBoards } from './data/sampleBoards';
+import { apiService } from './utils/api';
+import { Sparkles, BarChart2, ShieldCheck, Heart } from 'lucide-react';
+
+export default function App() {
+  const [currentBoard, setCurrentBoard] = useState(sampleBoards[0]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(null);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
+  const [isRegeneratingQuiz, setIsRegeneratingQuiz] = useState(false);
+
+  // Check backend health on mount
+  useEffect(() => {
+    const checkHealth = async () => {
+      const healthy = await apiService.checkBackendHealth();
+      setIsBackendConnected(healthy);
+    };
+    checkHealth();
+  }, []);
+
+  // Process a board (file or sample ID)
+  const handleProcessBoard = async (fileOrId) => {
+    setIsProcessing(true);
+    setProgress({ currentStep: 1, totalSteps: 6 });
+
+    try {
+      const processed = await apiService.uploadBoard(fileOrId, (stepProgress) => {
+        setProgress(stepProgress);
+      });
+      setCurrentBoard(processed);
+    } catch (err) {
+      console.error("Processing error:", err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Regenerate Quiz
+  const handleRegenerateQuiz = async () => {
+    if (!currentBoard) return;
+    setIsRegeneratingQuiz(true);
+    try {
+      const newQuiz = await apiService.regenerateQuiz(currentBoard.id);
+      setCurrentBoard(prev => ({ ...prev, quiz: newQuiz }));
+    } catch (err) {
+      console.error("Quiz regenerate failed:", err);
+    } finally {
+      setIsRegeneratingQuiz(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+      {/* Top Navigation */}
+      <Navbar
+        onOpenEvaluation={() => setIsEvaluationOpen(true)}
+        isBackendConnected={isBackendConnected}
+        currentBoard={currentBoard}
+      />
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        {/* Upload & Capture Card */}
+        <UploadSection
+          onProcessBoard={handleProcessBoard}
+          isProcessing={isProcessing}
+        />
+
+        {/* Live Processing Pipeline Ticker */}
+        {isProcessing && (
+          <ProcessingPipeline progress={progress} />
+        )}
+
+        {/* Quality Gate Rejection Banner (For dark / glare / blurry photos) */}
+        {!isProcessing && currentBoard && !currentBoard.isQualityPass && (
+          <QualityRejectModal
+            board={currentBoard}
+            onRetake={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onTryClearSample={() => {
+              handleProcessBoard(sampleBoards[0].id);
+            }}
+          />
+        )}
+
+        {/* Result Workspace (when quality passed) */}
+        {!isProcessing && currentBoard && currentBoard.isQualityPass && (
+          <div className="space-y-8 animate-fadeIn">
+            
+            {/* 1. Image Cleanup & Region Overlays */}
+            <ImageComparison board={currentBoard} />
+
+            {/* 2. Rebuilt Diagram (Mermaid Flowchart) */}
+            {currentBoard.diagram && (
+              <MermaidDiagram diagram={currentBoard.diagram} />
+            )}
+
+            {/* 3. Structured Study Notes (Markdown) */}
+            {currentBoard.notes && (
+              <StructuredNotes
+                notes={currentBoard.notes}
+                boardName={currentBoard.name}
+              />
+            )}
+
+            {/* 4. Active Recall Quiz & Flashcards */}
+            {currentBoard.quiz && (
+              <QuizSection
+                quiz={currentBoard.quiz}
+                onRegenerateQuiz={handleRegenerateQuiz}
+                isRegenerating={isRegeneratingQuiz}
+              />
+            )}
+
+            {/* 5. RAG Chat over Board */}
+            <RAGChatSection
+              boardId={currentBoard.id}
+              boardName={currentBoard.name}
+            />
+
+          </div>
+        )}
+
+      </main>
+
+      {/* Evaluation & Metrics Modal */}
+      <EvaluationModal
+        isOpen={isEvaluationOpen}
+        onClose={() => setIsEvaluationOpen(false)}
+      />
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-slate-200 py-6 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-slate-900">BoardSnap</span>
+            <span>&bull;</span>
+            <span>Banana Hacks 2026 Submission</span>
+          </div>
+          <div>
+            Built with <Heart className="w-3.5 h-3.5 text-rose-500 inline fill-rose-500 mx-0.5" /> by <strong className="text-slate-700">Ammar, Muavia, Moyeon &amp; Awais</strong>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsEvaluationOpen(true)}
+              className="text-emerald-700 hover:text-emerald-800 font-semibold underline underline-offset-2"
+            >
+              40-Photo Evaluation Report
+            </button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

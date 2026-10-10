@@ -1,39 +1,19 @@
 {
-  "project": "BoardSnap",
-  "hackathon": "Banana Hacks 2026",
-  "dataset_summary": {
-    "total_images": 40,
-    "train_split": 25,
-    "test_split_held_out": 15,
-    "contributors": {
-      "Ammar": 10,
-      "Muavia": 10,
-      "Moyeon": 10,
-      "Awais": 10
+  "status": "not_downloaded",
+  "source": "Roboflow Universe",
+  "datasets": {
+    "whiteboard": {
+      "workspace": "taerua",
+      "project": "whiteboard-ctvgi",
+      "version": 1,
+      "license": "CC BY 4.0"
     },
-    "variations_covered": [
-      "Camera angles (straight-on, 15° skew, 30° perspective distortion)",
-      "Lighting conditions (diffuse fluorescent, overhead spotlight glare, low-light shadows)",
-      "Marker quality (thick black dry-erase, faded green/blue, mixed color annotations)",
-      "Handwriting styles (cursive, print, mixed shorthand, all-caps)",
-      "Content types (flowcharts, state machines, architectural blocks, bullet lists, math formulas)"
-    ]
+    "handwriting": {
+      "workspace": "handwriting-detection-zfowd",
+      "project": "handwriting-detection-eoxpj",
+      "version": 8,
+      "license": "CC BY 4.0"
+    }
   },
-  "held_out_test_set": [
-    { "id": "test_01", "author": "Moyeon", "type": "Architecture flowchart", "skew": "12°", "lighting": "Medium glare", "ground_truth_nodes": 5, "ground_truth_edges": 4, "ground_truth_words": 38 },
-    { "id": "test_02", "author": "Moyeon", "type": "Database schema ERD", "skew": "5°", "lighting": "Even light", "ground_truth_nodes": 6, "ground_truth_edges": 5, "ground_truth_words": 52 },
-    { "id": "test_03", "author": "Moyeon", "type": "Meeting action items", "skew": "8°", "lighting": "Backlit window", "ground_truth_nodes": 0, "ground_truth_edges": 0, "ground_truth_words": 64 },
-    { "id": "test_04", "author": "Moyeon", "type": "Algorithm state chart", "skew": "20°", "lighting": "Overhead spot glare", "ground_truth_nodes": 4, "ground_truth_edges": 4, "ground_truth_words": 29 },
-    { "id": "test_05", "author": "Ammar", "type": "Microservices topology", "skew": "15°", "lighting": "Diffuse daylight", "ground_truth_nodes": 7, "ground_truth_edges": 6, "ground_truth_words": 46 },
-    { "id": "test_06", "author": "Ammar", "type": "Sprint retro matrix", "skew": "0°", "lighting": "Even", "ground_truth_nodes": 4, "ground_truth_edges": 0, "ground_truth_words": 71 },
-    { "id": "test_07", "author": "Ammar", "type": "API endpoint flow", "skew": "10°", "lighting": "Dim classroom", "ground_truth_nodes": 5, "ground_truth_edges": 4, "ground_truth_words": 34 },
-    { "id": "test_08", "author": "Muavia", "type": "Neural network DAG", "skew": "18°", "lighting": "Specular flash", "ground_truth_nodes": 6, "ground_truth_edges": 5, "ground_truth_words": 40 },
-    { "id": "test_09", "author": "Muavia", "type": "Math lecture notes", "skew": "4°", "lighting": "Even fluorescent", "ground_truth_nodes": 0, "ground_truth_edges": 0, "ground_truth_words": 85 },
-    { "id": "test_10", "author": "Muavia", "type": "Binary search tree", "skew": "12°", "lighting": "Shadow on bottom-left", "ground_truth_nodes": 7, "ground_truth_edges": 6, "ground_truth_words": 22 },
-    { "id": "test_11", "author": "Muavia", "type": "DevOps CI/CD gates", "skew": "14°", "lighting": "Direct sun glare", "ground_truth_nodes": 5, "ground_truth_edges": 5, "ground_truth_words": 49 },
-    { "id": "test_12", "author": "Awais", "type": "Operating system paging", "skew": "6°", "lighting": "Standard lab", "ground_truth_nodes": 4, "ground_truth_edges": 3, "ground_truth_words": 58 },
-    { "id": "test_13", "author": "Awais", "type": "Compilers AST parse tree", "skew": "22°", "lighting": "Overhead bulb reflection", "ground_truth_nodes": 8, "ground_truth_edges": 7, "ground_truth_words": 31 },
-    { "id": "test_14", "author": "Awais", "type": "Linear algebra notes", "skew": "2°", "lighting": "Good contrast", "ground_truth_nodes": 0, "ground_truth_edges": 0, "ground_truth_words": 92 },
-    { "id": "test_15", "author": "Awais", "type": "Event queue pub/sub", "skew": "16°", "lighting": "Corner flare", "ground_truth_nodes": 5, "ground_truth_edges": 4, "ground_truth_words": 41 }
-  ]
+  "message": "Run dataset/download_samples.py with ROBOFLOW_API_KEY set. This file is updated with the split image counts after successful downloads."
 }

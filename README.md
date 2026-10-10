@@ -52,8 +52,8 @@ boardsnap/
 │   ├── main.py         # Strict note synthesis, quiz generation & vector chat
 │   └── requirements.txt
 │
-├── dataset/            # 40-board proprietary dataset manifest & splits
-│   └── manifest.json   # 15 held-out test boards with ground-truth labels
+├── dataset/            # Roboflow dataset downloader and download manifest
+│   └── roboflow/       # Downloaded dataset exports (not committed)
 │
 └── docs/               # Hackathon submission documentation
     ├── EVALUATION_REPORT.md  # Quantitative metrics table (Detector, OCR, Graph)
@@ -90,24 +90,43 @@ pip install -r requirements.txt
 uvicorn main:app --port 8000 --reload
 ```
 
+### 4. Download an annotated whiteboard dataset
+
+The downloader fetches two separate public Roboflow Universe datasets in YOLOv8
+format, including their annotations and native train/valid/test splits:
+
+- [Whiteboard](https://universe.roboflow.com/taerua/whiteboard-ctvgi), version
+  1: 8,784 images, instance-segmentation classes `pen` and `whiteboard`.
+- [Handwriting detection](https://universe.roboflow.com/handwriting-detection-zfowd/handwriting-detection-eoxpj),
+  version 8: 361 images, object-detection class `handwriting`.
+
+Both project pages list the dataset license as CC BY 4.0. Keep the source
+attribution when using or redistributing the exports. These datasets detect
+whiteboard regions and handwriting regions; the handwriting labels do not
+provide transcribed text for OCR training.
+
+In PowerShell, install the downloader dependency, set your Roboflow API key,
+and run the downloader:
+
+```powershell
+pip install -r dataset\requirements.txt
+$env:ROBOFLOW_API_KEY = "your-roboflow-api-key"
+python dataset\download_samples.py
+```
+
+The exports are saved separately under `dataset\roboflow\whiteboard-v1` and
+`dataset\roboflow\handwriting-v8`. `dataset\manifest.json` records the source,
+license, and downloaded image counts. The API key is read from the environment
+and is not written to the manifest. Use `--format` to select another export
+format, `--output-dir` to choose a different destination root, or
+`--overwrite` to replace existing exports.
+
 ---
 
 ## 📊 Evaluation & Benchmark Results
-Evaluated on our proprietary dataset of **40 whiteboard photos** (10 from each teammate, with **15 held-out test photos**):
-
-| Component | Metric | Result | Benchmark Target |
-| :--- | :--- | :--- | :--- |
-| **Region Detector** | mAP@0.5 | **88.3%** | >80.0% |
-| **Text Blocks** | Precision / Recall | **92.4% / 90.8%** | >85.0% |
-| **Boxes & Shapes** | Precision / Recall | **89.1% / 87.5%** | >80.0% |
-| **Connector Arrows**| Precision / Recall | **84.7% / 81.2%** | >80.0% |
-| **Handwriting OCR** | Word Accuracy Rate | **86.4%** (TrOCR) | >80.0% |
-| **Flowchart Graph** | Rebuilt Node Recall | **93.3%** | >90.0% |
-| **Edge Association**| Directed Connection Accuracy | **88.0%** | >80.0% |
-| **Grounding Review** | Hallucinations on 20 boards | **0.0%** | 0.0% |
-| **Latency** | Mean End-to-End Latency | **4.8s** | <8.0s |
-
-See [`docs/EVALUATION_REPORT.md`](./docs/EVALUATION_REPORT.md) for full confusion matrices and model card notes.
+No quantitative results are claimed for the Roboflow exports yet. Evaluate each
+task against its matching held-out split and report those measurements before
+using them as benchmark results.
 
 ---
 

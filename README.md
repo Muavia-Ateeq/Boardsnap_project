@@ -109,7 +109,11 @@ inference. In `vision/.env`, set `ROBOFLOW_API_KEY` and paste the complete
 inference URL for the deployed Roboflow Workflow into `ROBOFLOW_WORKFLOW_URL`.
 The workflow URL selects the actual hosted detector; `ROBOFLOW_MODEL_ID` is
 only a log label. The service does not contain trained project YOLO weights.
-Never commit `vision/.env` or paste private API keys into chat.
+TrOCR processes detected text blocks one line at a time. To select the smaller
+official checkpoint on memory-limited systems, set
+`TROCR_MODEL_ID=microsoft/trocr-small-handwritten` in the local `.env`; its
+accuracy has not been benchmarked for this project. Never commit `vision/.env`
+or paste private API keys into chat.
 
 The backend calls the vision service at `http://localhost:8000` and the language
 service at `http://localhost:8001` by default. Configure `VISION_SERVICE_URL`

@@ -420,6 +420,61 @@ def _trocr_read(crop: Image.Image) -> str:
     return processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
 
 
+def _split_text_lines(crop: Image.Image) -> List[Image.Image]:
+    """Split a text block into line crops for TrOCR's line-oriented recognizer."""
+    gray = cv2.cvtColor(np.array(crop.convert("RGB")), cv2.COLOR_RGB2GRAY)
+    if gray.size == 0:
+        return [crop]
+
+    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    _, ink = cv2.threshold(
+        blurred,
+        0,
+        255,
+        cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU,
+    )
+    ink = cv2.morphologyEx(
+        ink,
+        cv2.MORPH_CLOSE,
+        cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)),
+    )
+
+    height, width = ink.shape
+    row_counts = np.count_nonzero(ink, axis=1)
+    active_rows = np.flatnonzero(row_counts >= max(2, round(width * 0.005)))
+    if active_rows.size == 0:
+        return [crop]
+
+    max_row_gap = max(1, min(4, height // 100))
+    groups: List[Tuple[int, int]] = []
+    start = previous = int(active_rows[0])
+    for row_value in active_rows[1:]:
+        row = int(row_value)
+        if row - previous > max_row_gap + 1:
+            groups.append((start, previous))
+            start = row
+        previous = row
+    groups.append((start, previous))
+
+    min_line_height = max(3, round(height * 0.02))
+    line_crops: List[Image.Image] = []
+    pad_x = max(2, round(width * 0.01))
+    pad_y = max(2, round(height * 0.01))
+    for top, bottom in groups:
+        if bottom - top + 1 < min_line_height:
+            continue
+        columns = np.flatnonzero(np.any(ink[top:bottom + 1], axis=0))
+        if columns.size == 0:
+            continue
+        left = max(0, int(columns[0]) - pad_x)
+        right = min(width, int(columns[-1]) + 1 + pad_x)
+        line_top = max(0, top - pad_y)
+        line_bottom = min(height, bottom + 1 + pad_y)
+        line_crops.append(crop.crop((left, line_top, right, line_bottom)))
+
+    return line_crops if len(line_crops) > 1 else [crop]
+
+
 def _ocr_regions(
     regions: List[Dict[str, Any]],
     image_b64: str,
@@ -451,7 +506,12 @@ def _ocr_regions(
         if pw < 8 or ph < 8:
             continue
         crop = pil_img.crop((x1, y1, x2, y2))
-        text = _trocr_read(crop)
+        line_texts = []
+        for line_crop in _split_text_lines(crop):
+            line_text = _trocr_read(line_crop)
+            if line_text:
+                line_texts.append(line_text)
+        text = "\n".join(line_texts)
         if text:
             r["text"] = text
             r["label"] = text  # update label with real OCR result
@@ -514,7 +574,8 @@ def _build_graph(regions: List[Dict[str, Any]]) -> Tuple[list, list, str]:
     # Build Mermaid
     mermaid_lines = ["graph LR"]
     for n in nodes:
-        label = n["label"].replace('"', "'")
+        label = n["label"].replace('"', "'").replace("\r\n", "\n").replace("\r", "\n")
+        label = label.replace("\n", "<br/>")
         shape = n["shape"]
         if shape == "diamond":
             mermaid_lines.append(f'    {n["id"]}{{"{label}"}}')

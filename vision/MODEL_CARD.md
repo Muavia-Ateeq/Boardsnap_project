@@ -14,7 +14,10 @@ Updated: October 11, 2026
    hosted workflow.
 3. **Handwriting recognition:** Hugging Face
    `microsoft/trocr-base-handwritten`, loaded on first OCR request. It is a
-   pretrained model, not a model fine-tuned by this project.
+   pretrained model, not a model fine-tuned by this project. Detected text
+   blocks are split into line crops because TrOCR is line-oriented; recognized
+   lines are joined with line breaks. `TROCR_MODEL_ID` can select another
+   compatible checkpoint, including Microsoft's smaller handwritten model.
 4. **Diagram graph:** a spatial heuristic associates each arrow with the two
    nearest detected shapes and compiles a Mermaid flowchart.
 
@@ -56,8 +59,9 @@ real handwritten images with manually checked transcripts.
   alone; its endpoint determines the actual hosted model and class mapping.
 - The two downloaded datasets have region labels, not transcribed handwriting.
 - `microsoft/trocr-base-handwritten` is primarily intended for English
-  handwriting and may perform poorly on dense multi-line text, whiteboard
-  diagrams, or non-Latin scripts.
+  handwriting. The line-splitting heuristic can miss tightly packed or
+  low-contrast lines, and the recognizer may perform poorly on diagrams or
+  non-Latin scripts.
 - A detector's `handwriting` region is a crop proposal, not recognized text.
 - The graph association is a nearest-centre heuristic; crossing and diagonal
   arrows can be connected incorrectly.

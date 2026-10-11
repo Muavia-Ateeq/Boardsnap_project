@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 from fastapi import HTTPException
 
 import main
@@ -80,6 +80,37 @@ class VisionTests(unittest.TestCase):
         self.assertEqual(result[0]["label"], "Written words")
         read.assert_called_once()
 
+    def test_ocr_recognizes_multiline_region_as_separate_lines(self):
+        image = Image.new("RGB", (500, 180), "white")
+        draw = ImageDraw.Draw(image)
+        draw.text((20, 25), "First handwritten line", fill="black")
+        draw.text((20, 115), "Second handwritten line", fill="black")
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        image_b64 = base64.b64encode(buffer.getvalue()).decode("ascii")
+        regions = [{
+            "id": "r1", "type": "text", "box": [0, 0, 100, 100],
+            "label": "handwriting", "confidence": 0.9,
+        }]
+
+        with patch.object(main, "_trocr_read", side_effect=["First line", "Second line"]) as read:
+            result = main._ocr_regions(regions, image_b64)
+
+        self.assertEqual(result[0]["text"], "First line\nSecond line")
+        self.assertEqual(read.call_count, 2)
+
+    def test_multiline_text_crop_is_split_for_line_recognition(self):
+        image = Image.new("RGB", (500, 180), "white")
+        draw = ImageDraw.Draw(image)
+        draw.text((20, 25), "First handwritten line", fill="black")
+        draw.text((20, 115), "Second handwritten line", fill="black")
+
+        lines = main._split_text_lines(image)
+
+        self.assertEqual(len(lines), 2)
+        self.assertLess(lines[0].height, image.height)
+        self.assertLess(lines[1].height, image.height)
+
     def test_ocr_does_not_hide_model_load_error(self):
         with patch.object(main, "_get_trocr", side_effect=ModuleNotFoundError("transformers")):
             with self.assertRaises(ModuleNotFoundError):
@@ -123,6 +154,15 @@ class VisionTests(unittest.TestCase):
         self.assertEqual(len(nodes), 2)
         self.assertEqual(len(edges), 1)
         self.assertIn("graph LR", mermaid)
+
+    def test_graph_builder_converts_ocr_line_breaks_for_mermaid(self):
+        regions = [{
+            "id": "box1", "type": "box", "box": [5, 20, 20, 20],
+            "label": "Start\nProcess",
+        }]
+        nodes, _, mermaid = main._build_graph(regions)
+        self.assertEqual(nodes[0]["label"], "Start\nProcess")
+        self.assertIn("Start<br/>Process", mermaid)
 
 
 if __name__ == "__main__":

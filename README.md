@@ -106,10 +106,17 @@ python -m uvicorn main:app --port 8000 --reload
 The Python virtual environment keeps ML packages isolated from other project
 work. TrOCR downloads its pretrained weights from Hugging Face on first
 inference. In `vision/.env`, set `ROBOFLOW_API_KEY` and paste the complete
-inference URL for the deployed Roboflow Workflow into `ROBOFLOW_WORKFLOW_URL`.
-The workflow URL selects the actual hosted detector; `ROBOFLOW_MODEL_ID` is
-only a log label. The service does not contain trained project YOLO weights.
-TrOCR processes detected text blocks one line at a time. To select the smaller
+inference URL for the region-detection workflow into `ROBOFLOW_WORKFLOW_URL`.
+The Qwen-VL OCR workflow is configured by default at
+`https://serverless.roboflow.com/moyeon-abrar/workflows/qwen-vl`; override it
+with `ROBOFLOW_OCR_WORKFLOW_URL` if needed. Both workflows use the same
+`ROBOFLOW_API_KEY`. `ROBOFLOW_MODEL_ID` is only a detector log label. The
+service does not contain trained project YOLO weights. When the Roboflow key
+is not configured, OCR continues to use the existing local OCR path. TrOCR
+processes detected text blocks one line at a time. When configured, Qwen-VL
+receives the full cleaned board once (not detector-limited crops), and its
+transcription is passed to notes generation and converted into a top-to-bottom
+flowchart using each non-empty transcript line as a sequential step. To select the smaller
 official checkpoint on memory-limited systems, set
 `TROCR_MODEL_ID=microsoft/trocr-small-handwritten` in the local `.env`; its
 accuracy has not been benchmarked for this project. Never commit `vision/.env`
@@ -145,13 +152,17 @@ not evidence of measured handwriting accuracy.
 ```bash
 cd llm
 pip install -r requirements.txt
-# Set GEMINI_API_KEY in this shell before starting the service
+# Copy .env.example to .env and set the API key for your selected provider
 uvicorn main:app --port 8001 --reload
 ```
 
-The language service requires a Gemini API key. Without it, notes and quiz
-generation return a service error and the board job will be marked `failed`
-instead of returning unrelated sample content.
+The language service supports Gemini, xAI Grok, and GroqCloud. For GroqCloud's
+free plan (subject to rate limits), set `LLM_PROVIDER=groq` and `GROQ_API_KEY`;
+`GROQ_MODEL` defaults to `openai/gpt-oss-120b`. Alternatively, use
+`LLM_PROVIDER=gemini` with `GEMINI_API_KEY`, or `LLM_PROVIDER=grok` with
+`XAI_API_KEY` and `GROK_MODEL`. The selected provider's key is required;
+provider or generation errors are reported and the board job is marked
+`failed` instead of returning unrelated sample content.
 
 ### 5. Download an annotated whiteboard dataset
 

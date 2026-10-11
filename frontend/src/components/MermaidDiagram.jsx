@@ -5,6 +5,9 @@ import { Copy, Check, Download, Code, Sparkles, Network } from 'lucide-react';
 mermaid.initialize({
   startOnLoad: false,
   theme: 'neutral',
+  themeVariables: {
+    fontSize: '20px',
+  },
   securityLevel: 'loose',
   flowchart: {
     useMaxWidth: true,

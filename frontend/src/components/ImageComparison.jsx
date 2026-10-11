@@ -128,7 +128,7 @@ export function ImageComparison({ board }) {
               />
 
               {/* Bounding Box Overlays */}
-              {showRegions && regions.map((region) => {
+              {showRegions && regions.filter((region) => region.type !== 'transcription').map((region) => {
                 const [x, y, w, h] = region.box;
                 const isHovered = hoveredRegion?.id === region.id;
 

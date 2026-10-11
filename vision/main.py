@@ -14,8 +14,10 @@ Endpoints
 
 Environment variables
 ---------------------
-  ROBOFLOW_API_KEY   (required for /detect)
-  ROBOFLOW_MODEL_ID  (default: "whiteboard-ctvgi/1")
+  ROBOFLOW_API_KEY          (shared by the detector and OCR workflows)
+  ROBOFLOW_WORKFLOW_URL     (hosted region-detection workflow)
+  ROBOFLOW_OCR_WORKFLOW_URL (Qwen-VL OCR workflow; configured by default)
+  ROBOFLOW_MODEL_ID         (detector log label)
 
 Run
 ---
@@ -64,6 +66,10 @@ app.add_middleware(
 ROBOFLOW_API_KEY = os.environ.get("ROBOFLOW_API_KEY", "")
 ROBOFLOW_MODEL_ID = os.environ.get("ROBOFLOW_MODEL_ID", "whiteboard-ctvgi/1")
 ROBOFLOW_WORKFLOW_URL = os.environ.get("ROBOFLOW_WORKFLOW_URL", "").strip()
+ROBOFLOW_OCR_WORKFLOW_URL = os.environ.get(
+    "ROBOFLOW_OCR_WORKFLOW_URL",
+    "https://serverless.roboflow.com/moyeon-abrar/workflows/qwen-vl",
+).strip()
 ALLOW_DEMO_DETECTOR_FALLBACK = os.environ.get("ALLOW_DEMO_DETECTOR_FALLBACK", "").lower() == "true"
 TROCR_MODEL_ID = os.environ.get("TROCR_MODEL_ID", "microsoft/trocr-base-handwritten")
 
@@ -559,6 +565,100 @@ def _ocr_regions(
     return regions
 
 
+def _extract_workflow_text(value: Any) -> Optional[str]:
+    """Extract recognized text from common Roboflow Workflow output shapes."""
+    if isinstance(value, str):
+        return value.strip()
+
+    if isinstance(value, list):
+        texts = [
+            text
+            for text in (_extract_workflow_text(item) for item in value)
+            if text
+        ]
+        return "\n".join(texts)
+
+    if isinstance(value, dict):
+        for key in (
+            "text",
+            "output",
+            "answer",
+            "result",
+            "response",
+            "transcription",
+            "recognized_text",
+            "predictions",
+            "qwen_vl_output",
+        ):
+            if key in value:
+                text = _extract_workflow_text(value[key])
+                if text is not None:
+                    return text
+
+    return None
+
+
+def _roboflow_ocr_text(image_b64: str, api_key: str) -> str:
+    """Send a complete board image to the configured Roboflow OCR workflow."""
+    import requests
+
+    if not ROBOFLOW_OCR_WORKFLOW_URL:
+        raise ValueError("ROBOFLOW_OCR_WORKFLOW_URL is empty")
+    if not api_key:
+        raise ValueError("ROBOFLOW_API_KEY is missing")
+
+    if image_b64.startswith("data:") and "," in image_b64:
+        image_b64 = image_b64.split(",", 1)[1]
+
+    authorization_header = "Bearer " + api_key
+    response = requests.post(
+        ROBOFLOW_OCR_WORKFLOW_URL,
+        json={
+            "inputs": {
+                "image": {
+                    "type": "base64",
+                    "value": image_b64,
+                },
+            },
+        },
+        headers={
+            "Authorization": authorization_header,
+            "Content-Type": "application/json",
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    data = response.json()
+    text = _extract_workflow_text(data.get("outputs", data))
+    if text is None:
+        raise ValueError("Roboflow OCR workflow response did not contain text")
+    return text
+
+
+def _roboflow_ocr_regions(
+    regions: List[Dict[str, Any]],
+    image_b64: str,
+    api_key: str,
+) -> List[Dict[str, Any]]:
+    """OCR the full board once and retain detector regions for diagram shapes."""
+    updated_regions = [dict(region) for region in regions]
+    text = _roboflow_ocr_text(image_b64, api_key)
+    if text:
+        updated_regions = [
+            region for region in updated_regions
+            if region.get("type") != "transcription"
+        ]
+        updated_regions.append({
+            "id": "qwen-vl-transcription",
+            "type": "transcription",
+            "box": [0, 0, 100, 100],
+            "label": "Full-board OCR",
+            "text": text,
+        })
+
+    return updated_regions
+
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  HELPERS – SPATIAL GRAPH BUILDER
@@ -574,9 +674,35 @@ def _distance(a: Tuple[float, float], b: Tuple[float, float]) -> float:
 
 def _build_graph(regions: List[Dict[str, Any]]) -> Tuple[list, list, str]:
     """
-    Connect arrows to the nearest box/text on each side.
-    Returns (nodes, edges, mermaid_string).
+    Build a flowchart from Qwen's reading-order transcript when available;
+    otherwise connect detected arrows to the nearest shapes.
     """
+    transcriptions = [
+        region.get("text", "")
+        for region in regions
+        if region.get("type") == "transcription"
+    ]
+    transcript = next((text for text in transcriptions if isinstance(text, str) and text.strip()), "")
+    if transcript:
+        lines = [line.strip() for line in transcript.splitlines() if line.strip()]
+        nodes = [
+            {"id": f"N{i}", "label": line, "shape": "box"}
+            for i, line in enumerate(lines)
+        ]
+        edges = [
+            {"from": nodes[i]["id"], "to": nodes[i + 1]["id"], "label": ""}
+            for i in range(len(nodes) - 1)
+        ]
+
+        mermaid_lines = ["graph TD"]
+        for node in nodes:
+            label = node["label"].replace('"', "'").replace("\r", " ").replace("\n", " ")
+            mermaid_lines.append(f'    {node["id"]}["{label}"]')
+        for edge in edges:
+            mermaid_lines.append(f'    {edge["from"]} --> {edge["to"]}')
+
+        return nodes, edges, "\n".join(mermaid_lines)
+
     shapes = [r for r in regions if r["type"] in ("box", "text", "parallelogram", "diamond")]
     arrows = [r for r in regions if r["type"] == "arrow"]
 
@@ -640,6 +766,7 @@ def _build_graph(regions: List[Dict[str, Any]]) -> Tuple[list, list, str]:
 
 @app.get("/health")
 def health():
+    roboflow_ocr_configured = bool(ROBOFLOW_API_KEY and ROBOFLOW_OCR_WORKFLOW_URL)
     return {
         "status": "ok",
         "service": "BoardSnap Vision & ML Service",
@@ -649,7 +776,8 @@ def health():
             "fallback_enabled": ALLOW_DEMO_DETECTOR_FALLBACK,
         },
         "ocr": {
-            "model": TROCR_MODEL_ID,
+            "provider": "Roboflow Qwen-VL" if roboflow_ocr_configured else "EasyOCR fallback",
+            "workflow_configured": roboflow_ocr_configured,
             "dependencies_installed": bool(
                 importlib.util.find_spec("torch")
                 and importlib.util.find_spec("transformers")
@@ -741,9 +869,9 @@ async def read_text_regions(
     clean_image_b64: str = Form(...),
 ):
     """
-    For every text/box region, crop the cleaned image and run TrOCR.
+    For every text/shape region, crop the cleaned image and run Roboflow OCR
+    when configured; otherwise use the local OCR implementation.
     Returns updated regions with 'text' field populated.
-    TrOCR is lazy-loaded on first call (~5 s download on first run, cached after).
     """
     try:
         regions: List[Dict[str, Any]] = json.loads(regions_json)
@@ -752,6 +880,22 @@ async def read_text_regions(
 
     if not clean_image_b64:
         raise HTTPException(status_code=422, detail="clean_image_b64 is required for OCR")
+
+    if ROBOFLOW_API_KEY and ROBOFLOW_OCR_WORKFLOW_URL:
+        try:
+            regions = _roboflow_ocr_regions(
+                regions,
+                clean_image_b64,
+                ROBOFLOW_API_KEY,
+            )
+        except Exception as exc:
+            log.exception("Roboflow Qwen-VL OCR failed to process the submitted regions")
+            raise HTTPException(
+                status_code=502,
+                detail="Roboflow OCR inference failed.",
+            ) from exc
+
+        return {"regions": regions, "model": "Roboflow Qwen-VL"}
 
     if not importlib.util.find_spec("torch") or not importlib.util.find_spec("transformers"):
         raise HTTPException(

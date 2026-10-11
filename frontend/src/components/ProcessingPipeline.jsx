@@ -5,14 +5,14 @@ const PIPELINE_STEPS = [
   {
     step: 1,
     title: "1. Perspective Rectification",
-    owner: "OpenCV (Muavia)",
+    owner: "OpenCV",
     icon: Eye,
     detail: "4-corner quad detection, warpPerspective to 1080p, specular glare attenuation."
   },
   {
     step: 2,
     title: "2. Quality Gate Evaluation",
-    owner: "Agent Evaluator (Ammar)",
+    owner: "Agent Evaluator",
     icon: ShieldCheck,
     detail: "Sharpness variance & contrast ratio check. Halts early if image is unreadable."
   },
@@ -33,14 +33,14 @@ const PIPELINE_STEPS = [
   {
     step: 5,
     title: "5. Diagram Graph Builder",
-    owner: "Spatial Builder (Muavia)",
+    owner: "Spatial Builder",
     icon: Network,
     detail: "Links arrow endpoints to shapes -> builds AST -> outputs Mermaid flowchart."
   },
   {
     step: 6,
     title: "6. Grounded Notes & Quiz",
-    owner: "Grounded LLM (Awais)",
+    owner: "Grounded LLM",
     icon: HelpCircle,
     detail: "Strictly grounded summary, definitions, action items & recall quiz."
   }

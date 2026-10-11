@@ -15,6 +15,11 @@ if API_KEY:
     genai.configure(api_key=API_KEY)
 
 MODEL_NAME = "gemini-3.8-flash"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+XAI_API_KEY = os.getenv("XAI_API_KEY", "")
+GROK_MODEL = os.getenv("GROK_MODEL", "grok-3-mini")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 app = FastAPI(title="BoardSnap LLM Service", version="1.0.0")
 
@@ -36,32 +41,86 @@ class ChatRequest(BaseModel):
     notes: Optional[Dict[str, Any]] = None
 
 
-def generate_json(prompt: str) -> Any:
-    """Ask Gemini for a JSON response."""
-    if not API_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="GEMINI_API_KEY is missing from the LLM environment."
-        )
-
+def generate_json(prompt: str, *, json_object: bool = True) -> Any:
+    """Ask the configured LLM provider for a JSON response."""
     try:
-        model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0.2,
-            },
-        )
-        return json.loads(response.text)
+        if LLM_PROVIDER == "gemini":
+            if not API_KEY:
+                raise HTTPException(
+                    status_code=500,
+                    detail="GEMINI_API_KEY is missing from the LLM environment."
+                )
+
+            model = genai.GenerativeModel(MODEL_NAME)
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "temperature": 0.2,
+                },
+            )
+            response_text = response.text
+        elif LLM_PROVIDER == "grok":
+            if not XAI_API_KEY:
+                raise HTTPException(
+                    status_code=500,
+                    detail="XAI_API_KEY is missing from the LLM environment."
+                )
+
+            from openai import OpenAI
+
+            client = OpenAI(
+                api_key=XAI_API_KEY,
+                base_url="https://api.x.ai/v1",
+            )
+            response_options = {"response_format": {"type": "json_object"}} if json_object else {}
+            response = client.chat.completions.create(
+                model=GROK_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                **response_options,
+            )
+            response_text = response.choices[0].message.content
+            if not response_text:
+                raise ValueError("Grok returned an empty response")
+        elif LLM_PROVIDER == "groq":
+            if not GROQ_API_KEY:
+                raise HTTPException(
+                    status_code=500,
+                    detail="GROQ_API_KEY is missing from the LLM environment."
+                )
+
+            from openai import OpenAI
+
+            client = OpenAI(
+                api_key=GROQ_API_KEY,
+                base_url="https://api.groq.com/openai/v1",
+            )
+            response_options = {"response_format": {"type": "json_object"}} if json_object else {}
+            response = client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                **response_options,
+            )
+            response_text = response.choices[0].message.content
+            if not response_text:
+                raise ValueError("Groq returned an empty response")
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="LLM_PROVIDER must be 'gemini', 'grok', or 'groq'."
+            )
+
+        return json.loads(response_text)
 
     except HTTPException:
         raise
     except Exception as exc:
-        print(f"Gemini request failed: {exc}")
+        print(f"{LLM_PROVIDER} request failed: {exc}")
         raise HTTPException(
             status_code=502,
-            detail="Gemini could not generate a valid response. Check the server logs."
+            detail=f"{LLM_PROVIDER} could not generate a valid JSON response. Check the server logs."
         )
 
 
@@ -100,7 +159,16 @@ def health():
     return {
         "status": "ok",
         "service": "BoardSnap LLM Grounded Service",
+        "llm_provider": LLM_PROVIDER,
+        "llm_configured": bool(
+            API_KEY if LLM_PROVIDER == "gemini"
+            else XAI_API_KEY if LLM_PROVIDER == "grok"
+            else GROQ_API_KEY if LLM_PROVIDER == "groq"
+            else False
+        ),
         "gemini_configured": bool(API_KEY),
+        "grok_configured": bool(XAI_API_KEY),
+        "groq_configured": bool(GROQ_API_KEY),
     }
 
 
@@ -149,7 +217,7 @@ Use empty arrays when the evidence does not support any entries.
     ):
         raise HTTPException(
             status_code=502,
-            detail="Gemini returned notes in an unexpected format."
+            detail=f"{LLM_PROVIDER} returned notes in an unexpected format."
         )
 
     return result
@@ -182,12 +250,12 @@ Each question must have exactly four options.
 Return only the JSON array.
 """
 
-    result = generate_json(prompt)
+    result = generate_json(prompt, json_object=False)
 
     if not isinstance(result, list):
         raise HTTPException(
             status_code=502,
-            detail="Gemini returned quiz questions in an unexpected format."
+            detail=f"{LLM_PROVIDER} returned quiz questions in an unexpected format."
         )
 
     return result
@@ -230,7 +298,7 @@ Return JSON:
     if not isinstance(result, dict) or "answer" not in result:
         raise HTTPException(
             status_code=502,
-            detail="Gemini returned an unexpected chat response."
+            detail=f"{LLM_PROVIDER} returned an unexpected chat response."
         )
 
     result.setdefault("source", "Supplied whiteboard evidence")

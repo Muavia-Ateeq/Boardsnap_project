@@ -420,6 +420,20 @@ def _trocr_read(crop: Image.Image) -> str:
     return processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
 
 
+_easyocr_reader = None
+
+
+def _get_easyocr_reader():
+    """Load EasyOCR once and reuse it."""
+    global _easyocr_reader
+
+    if _easyocr_reader is None:
+        import easyocr
+        _easyocr_reader = easyocr.Reader(["en"], gpu=False)
+
+    return _easyocr_reader
+
+
 def _split_text_lines(crop: Image.Image) -> List[Image.Image]:
     """Split a text block into line crops for TrOCR's line-oriented recognizer."""
     gray = cv2.cvtColor(np.array(crop.convert("RGB")), cv2.COLOR_RGB2GRAY)
@@ -475,50 +489,75 @@ def _split_text_lines(crop: Image.Image) -> List[Image.Image]:
     return line_crops if len(line_crops) > 1 else [crop]
 
 
+
 def _ocr_regions(
     regions: List[Dict[str, Any]],
     image_b64: str,
 ) -> List[Dict[str, Any]]:
-    """
-    For each text/box region, crop the area from the image and run TrOCR.
-    """
-    # Decode image
+    """Detect and read text directly from the original whiteboard image."""
     img_bytes = base64.b64decode(image_b64)
     pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     img_w, img_h = pil_img.size
 
-    for r in regions:
-        if r.get("type") not in ("text", "box", "parallelogram"):
-            continue
-        if not isinstance(r.get("box"), (list, tuple)) or len(r["box"]) != 4:
-            raise ValueError(f"Region {r.get('id', '<unknown>')} has an invalid box")
-        bx, by, bw, bh = r["box"]
-        if not all(math.isfinite(float(value)) for value in (bx, by, bw, bh)):
-            raise ValueError(f"Region {r.get('id', '<unknown>')} has non-finite box coordinates")
-        if bw <= 0 or bh <= 0:
-            continue
-        x1 = max(0, min(img_w, int(bx / 100 * img_w)))
-        y1 = max(0, min(img_h, int(by / 100 * img_h)))
-        x2 = max(x1, min(img_w, int((bx + bw) / 100 * img_w)))
-        y2 = max(y1, min(img_h, int((by + bh) / 100 * img_h)))
-        pw = x2 - x1
-        ph = y2 - y1
-        if pw < 8 or ph < 8:
-            continue
-        crop = pil_img.crop((x1, y1, x2, y2))
-        line_texts = []
-        for line_crop in _split_text_lines(crop):
-            line_text = _trocr_read(line_crop)
-            if line_text:
-                line_texts.append(line_text)
-        text = "\n".join(line_texts)
-        if text:
-            r["text"] = text
-            r["label"] = text  # update label with real OCR result
-        else:
-            r["text"] = ""
+    reader = _get_easyocr_reader()
+    # Improve contrast and enlarge handwriting before OCR.
+    img = np.array(pil_img)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
+    upscaled = cv2.resize(
+        enhanced,
+        None,
+        fx=2,
+        fy=2,
+        interpolation=cv2.INTER_CUBIC,
+    )
+    results = reader.readtext(
+        upscaled,
+        detail=1,
+        paragraph=False,
+    )
 
+    # Keep Roboflow's shapes, but replace its text detections.
+    regions = [r for r in regions if r.get("type") != "text"]
+
+    added = 0
+    for bbox, text, confidence in results:
+        text = text.strip()
+        log.info("EasyOCR result: %r (confidence=%.3f)", text, confidence)
+        # Ignore empty or very low-confidence OCR results.
+        if not text or confidence < 0.15:
+            continue
+
+        xs = [point[0] for point in bbox]
+        ys = [point[1] for point in bbox]
+
+        x1 = max(0.0, min(100.0, min(xs) / img_w * 100))
+        y1 = max(0.0, min(100.0, min(ys) / img_h * 100))
+        x2 = max(x1, min(100.0, max(xs) / img_w * 100))
+        y2 = max(y1, min(100.0, max(ys) / img_h * 100))
+
+        if x2 <= x1 or y2 <= y1:
+            continue
+
+        added += 1
+        regions.append({
+            "id": f"ocr_{added}",
+            "type": "text",
+            "box": [
+                round(x1, 2),
+                round(y1, 2),
+                round(x2 - x1, 2),
+                round(y2 - y1, 2),
+            ],
+            "label": text,
+            "text": text,
+            "confidence": round(float(confidence), 3),
+        })
+
+    log.info("EasyOCR detected %s text regions", added)
     return regions
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════

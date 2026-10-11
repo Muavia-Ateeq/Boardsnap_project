@@ -19,16 +19,16 @@ const PIPELINE_STEPS = [
   {
     step: 3,
     title: "3. Region & Shape Detection",
-    owner: "PyTorch YOLO (Muavia)",
+    owner: "Roboflow Workflow",
     icon: Cpu,
-    detail: "Bounding boxes for text blocks, boxes, circles, arrows, and tables."
+    detail: "Hosted workflow proposes text and diagram regions."
   },
   {
     step: 4,
     title: "4. Handwriting OCR",
-    owner: "TrOCR + Lexicon (Muavia & Awais)",
+    owner: "Hugging Face TrOCR",
     icon: FileText,
-    detail: "Extract handwritten tokens per region with contextual dictionary correction."
+    detail: "Recognizes text from detected crops; handwriting accuracy depends on image and crop quality."
   },
   {
     step: 5,

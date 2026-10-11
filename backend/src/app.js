@@ -153,9 +153,9 @@ export function createApp({ repository, config }) {
     }
   });
 
-  app.post('/api/chat', async (req, res, next) => {
+  async function handleBoardChat(req, res, next) {
     try {
-      const { boardId, query } = req.body || {};
+      const { boardId, query } = req.method === 'GET' ? req.query : req.body || {};
       if (typeof boardId !== 'string' || !boardId.trim() || typeof query !== 'string' || !query.trim()) {
         res.status(400).json({ error: 'boardId and a non-empty query are required.' });
         return;
@@ -188,7 +188,10 @@ export function createApp({ repository, config }) {
     } catch (error) {
       next(error);
     }
-  });
+  }
+
+  app.get('/api/chat', handleBoardChat);
+  app.post('/api/chat', handleBoardChat);
 
   app.get('/api/boards/:id/export', async (req, res, next) => {
     try {

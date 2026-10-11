@@ -142,6 +142,13 @@ test('image upload runs vision and language stages and serves board actions', as
   });
   assert.deepEqual(await chatResponse.json(), { answer: 'The board says start.', source: 'Region r1' });
 
+  const chatGetUrl = new URL('/api/chat', baseUrl);
+  chatGetUrl.searchParams.set('boardId', board.id);
+  chatGetUrl.searchParams.set('query', 'Where?');
+  const chatGetResponse = await fetch(chatGetUrl);
+  assert.equal(chatGetResponse.status, 200);
+  assert.deepEqual(await chatGetResponse.json(), { answer: 'The board says start.', source: 'Region r1' });
+
   const exportResponse = await fetch(`${baseUrl}/api/boards/${board.id}/export?format=md`);
   assert.equal(exportResponse.status, 200);
   assert.match(await exportResponse.text(), /# Test board/);

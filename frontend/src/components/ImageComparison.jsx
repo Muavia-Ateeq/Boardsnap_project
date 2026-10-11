@@ -19,7 +19,7 @@ export function ImageComparison({ board }) {
           <div className="flex items-center gap-2">
             <h3 className="text-xl font-extrabold text-ink font-mono">Whiteboard Cleanup & AI Regions</h3>
             <span className="text-xs bg-banana-300 text-ink font-mono font-bold px-2.5 py-0.5 rounded-md border border-ink shadow-retro-sm">
-              OpenCV + PyTorch
+              OpenCV + Roboflow + TrOCR
             </span>
           </div>
           <p className="text-xs text-ink-muted mt-0.5 font-medium">
@@ -81,7 +81,7 @@ export function ImageComparison({ board }) {
             <div className="font-extrabold text-ink">{board.metrics.glareSuppressed}</div>
           </div>
           <div>
-            <div className="text-[10px] text-ink-muted uppercase font-bold">Handwriting Recall</div>
+            <div className="text-[10px] text-ink-muted uppercase font-bold">Image Sharpness</div>
             <div className="font-extrabold text-ink">{board.metrics.textConfidence}</div>
           </div>
         </div>

@@ -98,8 +98,8 @@ py -3.12 -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -r requirements.txt
-Copy-Item .env.example .env
-# Edit .env locally; do not commit the API key
+if (-not (Test-Path .env)) { New-Item -ItemType File -Path .env }
+# Edit .env locally; never copy a private key into .env.example
 python -m uvicorn main:app --port 8000 --reload
 ```
 

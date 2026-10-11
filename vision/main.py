@@ -32,7 +32,7 @@ import logging
 import math
 import os
 import time
-import uuid
+import importlib.util
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -63,6 +63,9 @@ app.add_middleware(
 # ── env ───────────────────────────────────────────────────────────────────────
 ROBOFLOW_API_KEY = os.environ.get("ROBOFLOW_API_KEY", "")
 ROBOFLOW_MODEL_ID = os.environ.get("ROBOFLOW_MODEL_ID", "whiteboard-ctvgi/1")
+ROBOFLOW_WORKFLOW_URL = os.environ.get("ROBOFLOW_WORKFLOW_URL", "").strip()
+ALLOW_DEMO_DETECTOR_FALLBACK = os.environ.get("ALLOW_DEMO_DETECTOR_FALLBACK", "").lower() == "true"
+TROCR_MODEL_ID = os.environ.get("TROCR_MODEL_ID", "microsoft/trocr-base-handwritten")
 
 # ── lazy TrOCR loader (loaded once on first call) ─────────────────────────────
 _trocr_processor = None
@@ -71,14 +74,11 @@ _trocr_model = None
 def _get_trocr():
     global _trocr_processor, _trocr_model
     if _trocr_processor is None:
-        log.info("Loading TrOCR model (microsoft/trocr-base-handwritten) …")
+        log.info("Loading TrOCR model (%s) …", TROCR_MODEL_ID)
         from transformers import TrOCRProcessor, VisionEncoderDecoderModel
-        _trocr_processor = TrOCRProcessor.from_pretrained(
-            "microsoft/trocr-base-handwritten"
-        )
-        _trocr_model = VisionEncoderDecoderModel.from_pretrained(
-            "microsoft/trocr-base-handwritten"
-        )
+        _trocr_processor = TrOCRProcessor.from_pretrained(TROCR_MODEL_ID)
+        _trocr_model = VisionEncoderDecoderModel.from_pretrained(TROCR_MODEL_ID)
+        _trocr_model.eval()
         log.info("TrOCR loaded.")
     return _trocr_processor, _trocr_model
 
@@ -278,13 +278,12 @@ def clean_whiteboard(raw_bytes: bytes) -> Tuple[np.ndarray, dict]:
 
 def _roboflow_detect(image_b64: str, model_id: str, api_key: str) -> List[RegionItem]:
     """Call the BoardSnap YOLO-World workflow on Roboflow."""
-    import os
     import requests
 
-    url = os.environ.get("ROBOFLOW_WORKFLOW_URL", "").strip()
-
-    if not url:
+    if not ROBOFLOW_WORKFLOW_URL:
         raise ValueError("ROBOFLOW_WORKFLOW_URL is missing from vision/.env")
+    if not api_key:
+        raise ValueError("ROBOFLOW_API_KEY is missing from vision/.env")
 
     # Remove an optional image data-URL prefix, if present.
     if image_b64.startswith("data:") and "," in image_b64:
@@ -301,7 +300,7 @@ def _roboflow_detect(image_b64: str, model_id: str, api_key: str) -> List[Region
     }
 
     resp = requests.post(
-        url,
+        ROBOFLOW_WORKFLOW_URL,
         json=payload,
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -319,7 +318,7 @@ def _roboflow_detect(image_b64: str, model_id: str, api_key: str) -> List[Region
 
     resp.raise_for_status()
     data = resp.json()
-    log.info("YOLO-World raw response: %s", str(data)[:4000])
+    log.info("Roboflow workflow response received for %s", model_id)
     # Workflow results may nest predictions inside "predictions".
     outputs = data.get("outputs", [])
 
@@ -335,10 +334,14 @@ def _roboflow_detect(image_b64: str, model_id: str, api_key: str) -> List[Region
         img_info = data.get("image", {})
         predictions = result
 
+    if not isinstance(predictions, list):
+        raise ValueError("Roboflow workflow response is missing a predictions list")
     log.info("YOLO-World prediction count: %s", len(predictions))
 
     img_w = img_info.get("width", 1) or 1
     img_h = img_info.get("height", 1) or 1
+    if img_w <= 0 or img_h <= 0:
+        raise ValueError("Roboflow workflow returned invalid image dimensions")
 
     type_map = {
         "whiteboard": "box",
@@ -360,20 +363,22 @@ def _roboflow_detect(image_b64: str, model_id: str, api_key: str) -> List[Region
         pw = float(pred["width"])
         ph = float(pred["height"])
 
-        x_pct = max(0.0, (cx - pw / 2) / img_w * 100)
-        y_pct = max(0.0, (cy - ph / 2) / img_h * 100)
-        w_pct = min(100.0, pw / img_w * 100)
-        h_pct = min(100.0, ph / img_h * 100)
+        x1 = min(100.0, max(0.0, (cx - pw / 2) / img_w * 100))
+        y1 = min(100.0, max(0.0, (cy - ph / 2) / img_h * 100))
+        x2 = min(100.0, max(x1, (cx + pw / 2) / img_w * 100))
+        y2 = min(100.0, max(y1, (cy + ph / 2) / img_h * 100))
+        if x2 <= x1 or y2 <= y1:
+            continue
 
         regions.append(
             RegionItem(
                 id=f"r{i + 1}",
                 type=type_map.get(class_name, "text"),
                 box=[
-                    round(x_pct, 2),
-                    round(y_pct, 2),
-                    round(w_pct, 2),
-                    round(h_pct, 2),
+                    round(x1, 2),
+                    round(y1, 2),
+                    round(x2 - x1, 2),
+                    round(y2 - y1, 2),
                 ],
                 label=class_name.title(),
                 confidence=round(confidence, 3),
@@ -406,14 +411,13 @@ def _fallback_regions(reason: str) -> List[RegionItem]:
 
 def _trocr_read(crop: Image.Image) -> str:
     """Run TrOCR on a cropped PIL image, return the transcribed text."""
-    try:
-        processor, model = _get_trocr()
-        pixel_values = processor(images=crop.convert("RGB"), return_tensors="pt").pixel_values
-        generated_ids = model.generate(pixel_values, max_new_tokens=64)
-        return processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-    except Exception as exc:
-        log.warning(f"TrOCR failed on crop: {exc}")
-        return ""
+    import torch
+
+    processor, model = _get_trocr()
+    pixel_values = processor(images=crop.convert("RGB"), return_tensors="pt").pixel_values
+    with torch.inference_mode():
+        generated_ids = model.generate(pixel_values, max_new_tokens=128)
+    return processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
 
 
 def _ocr_regions(
@@ -431,23 +435,28 @@ def _ocr_regions(
     for r in regions:
         if r.get("type") not in ("text", "box", "parallelogram"):
             continue
+        if not isinstance(r.get("box"), (list, tuple)) or len(r["box"]) != 4:
+            raise ValueError(f"Region {r.get('id', '<unknown>')} has an invalid box")
         bx, by, bw, bh = r["box"]
-        # Convert % to pixels
-        px = int(bx / 100 * img_w)
-        py = int(by / 100 * img_h)
-        pw = int(bw / 100 * img_w)
-        ph = int(bh / 100 * img_h)
-        # Clamp
-        px, py = max(0, px), max(0, py)
-        pw = min(pw, img_w - px)
-        ph = min(ph, img_h - py)
+        if not all(math.isfinite(float(value)) for value in (bx, by, bw, bh)):
+            raise ValueError(f"Region {r.get('id', '<unknown>')} has non-finite box coordinates")
+        if bw <= 0 or bh <= 0:
+            continue
+        x1 = max(0, min(img_w, int(bx / 100 * img_w)))
+        y1 = max(0, min(img_h, int(by / 100 * img_h)))
+        x2 = max(x1, min(img_w, int((bx + bw) / 100 * img_w)))
+        y2 = max(y1, min(img_h, int((by + bh) / 100 * img_h)))
+        pw = x2 - x1
+        ph = y2 - y1
         if pw < 8 or ph < 8:
             continue
-        crop = pil_img.crop((px, py, px + pw, py + ph))
+        crop = pil_img.crop((x1, y1, x2, y2))
         text = _trocr_read(crop)
         if text:
             r["text"] = text
             r["label"] = text  # update label with real OCR result
+        else:
+            r["text"] = ""
 
     return regions
 
@@ -534,7 +543,19 @@ def health():
     return {
         "status": "ok",
         "service": "BoardSnap Vision & ML Service",
-        "roboflow_ready": bool(ROBOFLOW_API_KEY),
+        "detector": {
+            "provider": "Roboflow Hosted Workflow (YOLO-World)",
+            "configured": bool(ROBOFLOW_API_KEY and ROBOFLOW_WORKFLOW_URL),
+            "fallback_enabled": ALLOW_DEMO_DETECTOR_FALLBACK,
+        },
+        "ocr": {
+            "model": TROCR_MODEL_ID,
+            "dependencies_installed": bool(
+                importlib.util.find_spec("torch")
+                and importlib.util.find_spec("transformers")
+            ),
+            "model_loaded": _trocr_model is not None,
+        },
         "trocr_loaded": _trocr_processor is not None,
     }
 
@@ -581,8 +602,8 @@ async def detect_regions(
       - multipart file upload  (raw or cleaned image)
       - clean_image_b64        (base64 string from /vision/clean response)
 
-    Calls Roboflow Inference API → returns normalised region list.
-    Falls back to demo regions if ROBOFLOW_API_KEY is unset.
+    Calls the configured Roboflow hosted workflow. Demo regions are only
+    returned when ALLOW_DEMO_DETECTOR_FALLBACK=true is explicitly set.
     """
     if file is not None:
         raw = await file.read()
@@ -592,21 +613,25 @@ async def detect_regions(
     else:
         raise HTTPException(status_code=422, detail="Provide file or clean_image_b64")
 
-    if ROBOFLOW_API_KEY:
-        try:
-            regions = _roboflow_detect(image_b64, ROBOFLOW_MODEL_ID, ROBOFLOW_API_KEY)
-            log.info(f"Roboflow detected {len(regions)} regions")
-        except Exception as exc:
-            status_code = getattr(getattr(exc, "response", None), "status_code", None)
-            if status_code:
-                reason = f"Roboflow request failed (HTTP {status_code})"
-            else:
-                reason = f"Roboflow request failed ({type(exc).__name__})"
-            regions = _fallback_regions(reason)
-    else:
-        regions = _fallback_regions("ROBOFLOW_API_KEY is missing")
+    if not ROBOFLOW_API_KEY or not ROBOFLOW_WORKFLOW_URL:
+        if ALLOW_DEMO_DETECTOR_FALLBACK:
+            regions = _fallback_regions("Roboflow detector is not configured")
+            return {"regions": [r.model_dump() for r in regions], "source": "demo-fallback"}
+        raise HTTPException(
+            status_code=503,
+            detail="Detector is not configured. Set ROBOFLOW_API_KEY and ROBOFLOW_WORKFLOW_URL in vision/.env.",
+        )
 
-    return {"regions": [r.model_dump() for r in regions]}
+    try:
+        regions = _roboflow_detect(image_b64, ROBOFLOW_MODEL_ID, ROBOFLOW_API_KEY)
+    except Exception as exc:
+        if ALLOW_DEMO_DETECTOR_FALLBACK:
+            regions = _fallback_regions(f"Roboflow request failed ({type(exc).__name__})")
+            return {"regions": [r.model_dump() for r in regions], "source": "demo-fallback"}
+        log.exception("Roboflow workflow inference failed")
+        raise HTTPException(status_code=502, detail="Roboflow detector inference failed.") from exc
+
+    return {"regions": [r.model_dump() for r in regions], "source": "roboflow"}
 
 
 # ── /vision/ocr ───────────────────────────────────────────────────────────────
@@ -628,12 +653,22 @@ async def read_text_regions(
     if not clean_image_b64:
         raise HTTPException(status_code=422, detail="clean_image_b64 is required for OCR")
 
+    if not importlib.util.find_spec("torch") or not importlib.util.find_spec("transformers"):
+        raise HTTPException(
+            status_code=503,
+            detail="OCR dependencies are not installed. Install vision/requirements.txt.",
+        )
+
     try:
         regions = _ocr_regions(regions, clean_image_b64)
     except Exception as exc:
-        log.warning(f"OCR pass failed: {exc} – returning regions without text")
+        log.exception("TrOCR failed to process the submitted regions")
+        raise HTTPException(
+            status_code=503,
+            detail="Handwriting OCR failed to load or process the image.",
+        ) from exc
 
-    return {"regions": regions}
+    return {"regions": regions, "model": TROCR_MODEL_ID}
 
 
 # ── /vision/graph ─────────────────────────────────────────────────────────────

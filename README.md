@@ -91,23 +91,32 @@ images are stored in `backend/uploads` by default; production deployments need
 a persistent disk or a configured `UPLOAD_DIR`.
 
 ### 3. Run the Vision & ML Service
-```bash
+```powershell
 cd vision
-pip install -r requirements.txt
-uvicorn main:app --port 8000 --reload
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+# Edit .env locally; do not commit the API key
+python -m uvicorn main:app --port 8000 --reload
 ```
 
-Before starting it, copy `vision/.env.example` to `vision/.env` and add your
-Roboflow private API key as `ROBOFLOW_API_KEY`. The Vision service loads this
-file automatically; `.env` is ignored by Git, so each teammate must provide
-their own key. `ROBOFLOW_MODEL_ID` can be changed there to match the model and
-version shown in Roboflow's Hosted API page.
+The Python virtual environment keeps ML packages isolated from other project
+work. TrOCR downloads its pretrained weights from Hugging Face on first
+inference. In `vision/.env`, set `ROBOFLOW_API_KEY` and paste the complete
+inference URL for the deployed Roboflow Workflow into `ROBOFLOW_WORKFLOW_URL`.
+The workflow URL selects the actual hosted detector; `ROBOFLOW_MODEL_ID` is
+only a log label. The service does not contain trained project YOLO weights.
+Never commit `vision/.env` or paste private API keys into chat.
 
 The backend calls the vision service at `http://localhost:8000` and the language
 service at `http://localhost:8001` by default. Configure `VISION_SERVICE_URL`
 and `LLM_SERVICE_URL` in `backend/.env` when these services are hosted elsewhere.
-To use hosted region detection, configure `ROBOFLOW_API_KEY` in `vision/.env`;
-without a key, its detect endpoint returns demo regions. An image
+When detector configuration is missing, `/vision/detect` returns a clear
+service error instead of demo regions. Set `ALLOW_DEMO_DETECTOR_FALLBACK=true`
+only when intentionally demonstrating fallback data. An image
 upload returns a queued board, then the frontend polls `GET /api/boards/:id`
 while the backend runs cleanup, detection, OCR, graph construction, grounded
 notes, and quiz generation. A quality-gate rejection completes with
@@ -118,6 +127,15 @@ replaced by fabricated sample-board results.
 The public API also includes `POST /api/boards/:id/quiz`, `POST /api/chat`,
 `GET /api/boards/:id/export?format=md`, and `GET /api/health`. Run backend
 contract tests with `cd backend && npm test`.
+
+Check vision setup and run local tests from the active `vision` virtual
+environment with `python -m unittest test_vision.py`. The previous hard-coded
+OCR benchmark values have been removed. To measure TrOCR on actual held-out,
+manually transcribed image crops, create a JSON manifest with `image`,
+`ground_truth`, and optional normalized `box: [x, y, width, height]` fields and
+run `python benchmark_ocr.py --manifest path\to\test-manifest.json`. These
+Roboflow datasets contain region annotations, not OCR transcripts; they are
+not evidence of measured handwriting accuracy.
 
 ### 4. Run the Language Service
 ```bash

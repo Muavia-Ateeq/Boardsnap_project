@@ -1,0 +1,19 @@
+{
+  "status": "not_downloaded",
+  "source": "Roboflow Universe",
+  "datasets": {
+    "whiteboard": {
+      "workspace": "taerua",
+      "project": "whiteboard-ctvgi",
+      "version": 1,
+      "license": "CC BY 4.0"
+    },
+    "handwriting": {
+      "workspace": "handwriting-detection-zfowd",
+      "project": "handwriting-detection-eoxpj",
+      "version": 8,
+      "license": "CC BY 4.0"
+    }
+  },
+  "message": "Run dataset/download_samples.py with ROBOFLOW_API_KEY set. This file is updated with the split image counts after successful downloads."
+}

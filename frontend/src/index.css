@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #FFFDF5;
+    color: #191A17;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Banana Hacks Retro Hard Cards and Buttons */
+.retro-card {
+  background-color: #FFFFFF;
+  border: 2px solid #191A17;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0px #191A17;
+}
+
+.retro-card-yellow {
+  background-color: #FFF6D6;
+  border: 2px solid #191A17;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0px #191A17;
+}
+
+.retro-btn {
+  border: 2px solid #191A17;
+  box-shadow: 2.5px 2.5px 0px #191A17;
+  transition: all 0.1s ease-in-out;
+}
+
+.retro-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3.5px 3.5px 0px #191A17;
+}
+
+.retro-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0.5px 0.5px 0px #191A17;
+}
+
+.retro-pill {
+  border: 1.5px solid #191A17;
+  box-shadow: 1.5px 1.5px 0px #191A17;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FFFBF0;
+}
+::-webkit-scrollbar-thumb {
+  background: #FDD835;
+  border: 1.5px solid #191A17;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #FBC02D;
+}

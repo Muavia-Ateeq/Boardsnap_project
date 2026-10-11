@@ -6,6 +6,8 @@ import fs from 'fs';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const VISION_SERVICE_URL = (process.env.VISION_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const VISION_REQUEST_TIMEOUT_MS = Number(process.env.VISION_REQUEST_TIMEOUT_MS || 300000);
 
 app.use(cors());
 app.use(express.json());
@@ -21,9 +23,27 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => cb(null, `board_${Date.now()}_${file.originalname}`)
 });
 const upload = multer({ storage });
+app.use('/uploads', express.static(uploadDir));
 
 // In-memory boards repository (for fast demo / persistence fallback)
 const boardsDb = new Map();
+
+async function postVisionForm(endpoint, formData) {
+  const response = await fetch(`${VISION_SERVICE_URL}${endpoint}`, {
+    method: 'POST',
+    body: formData,
+    signal: AbortSignal.timeout(VISION_REQUEST_TIMEOUT_MS),
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(payload?.detail || `Vision service ${endpoint} failed (${response.status})`);
+  }
+  if (!payload) {
+    throw new Error(`Vision service ${endpoint} returned an invalid response`);
+  }
+  return payload;
+}
 
 // Sample base data
 const SAMPLE_BOARD = {
@@ -116,22 +136,98 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'BoardSnap Orchestrator API', timestamp: new Date().toISOString() });
 });
 
-// Upload a whiteboard image & run agent pipeline
-app.post('/api/boards', upload.single('image'), (req, res) => {
+// Upload a whiteboard image & run the vision pipeline
+app.post('/api/boards', upload.single('image'), async (req, res) => {
   const boardId = `b_${Date.now()}`;
   const file = req.file;
 
-  const newBoard = {
-    ...SAMPLE_BOARD,
-    id: boardId,
-    status: "done",
-    quality: 0.89,
-    rawImageUrl: file ? `/uploads/${file.filename}` : SAMPLE_BOARD.cleanImageUrl,
-    cleanImageUrl: file ? `/uploads/${file.filename}` : SAMPLE_BOARD.cleanImageUrl,
-  };
+  if (!file) {
+    const demoBoard = { ...SAMPLE_BOARD, id: boardId, processingMode: 'demo' };
+    boardsDb.set(boardId, demoBoard);
+    return res.status(201).json(demoBoard);
+  }
 
-  boardsDb.set(boardId, newBoard);
-  res.status(201).json(newBoard);
+  const rawImageUrl = `/uploads/${encodeURIComponent(file.filename)}`;
+
+  try {
+    const rawImage = await fs.promises.readFile(file.path);
+    const cleanForm = new FormData();
+    cleanForm.append('file', new Blob([rawImage], { type: file.mimetype }), file.originalname);
+
+    const cleaned = await postVisionForm('/vision/clean', cleanForm);
+    if (
+      typeof cleaned.cleanImageB64 !== 'string' ||
+      !cleaned.cleanImageB64 ||
+      typeof cleaned.quality !== 'number' ||
+      typeof cleaned.isQualityPass !== 'boolean'
+    ) {
+      throw new Error('Vision service /vision/clean response is invalid');
+    }
+
+    const cleanFilename = `${boardId}_clean.png`;
+    const cleanImagePath = path.join(uploadDir, cleanFilename);
+    await fs.promises.writeFile(cleanImagePath, Buffer.from(cleaned.cleanImageB64, 'base64'));
+    const cleanImageUrl = `/uploads/${encodeURIComponent(cleanFilename)}`;
+
+    let regions = [];
+    let diagram = { nodes: [], edges: [], mermaid: '' };
+    if (cleaned.isQualityPass) {
+      const detectForm = new FormData();
+      detectForm.append('clean_image_b64', cleaned.cleanImageB64);
+      const detected = await postVisionForm('/vision/detect', detectForm);
+      if (!Array.isArray(detected.regions)) {
+        throw new Error('Vision service /vision/detect response is missing regions');
+      }
+
+      const ocrForm = new FormData();
+      ocrForm.append('regions_json', JSON.stringify(detected.regions));
+      ocrForm.append('clean_image_b64', cleaned.cleanImageB64);
+      const recognized = await postVisionForm('/vision/ocr', ocrForm);
+      if (!Array.isArray(recognized.regions)) {
+        throw new Error('Vision service /vision/ocr response is missing regions');
+      }
+      regions = recognized.regions;
+
+      const graphForm = new FormData();
+      graphForm.append('regions_json', JSON.stringify(regions));
+      diagram = await postVisionForm('/vision/graph', graphForm);
+      if (!Array.isArray(diagram.nodes) || !Array.isArray(diagram.edges) || typeof diagram.mermaid !== 'string') {
+        throw new Error('Vision service /vision/graph response is invalid');
+      }
+    }
+
+    const newBoard = {
+      ...SAMPLE_BOARD,
+      id: boardId,
+      name: file.originalname,
+      status: 'done',
+      quality: cleaned.quality,
+      isQualityPass: cleaned.isQualityPass,
+      metrics: cleaned.metrics,
+      rawImageUrl,
+      cleanImageUrl,
+      regions,
+      diagram,
+      processingMode: 'vision',
+    };
+
+    boardsDb.set(boardId, newBoard);
+    return res.status(201).json(newBoard);
+  } catch (error) {
+    console.warn(`[BoardSnap] Vision pipeline failed for ${boardId}; returning demo results:`, error);
+    const demoBoard = {
+      ...SAMPLE_BOARD,
+      id: boardId,
+      name: file.originalname,
+      status: 'done',
+      rawImageUrl,
+      cleanImageUrl: rawImageUrl,
+      processingMode: 'demo',
+      pipelineWarning: `Vision processing failed: ${error.message}`,
+    };
+    boardsDb.set(boardId, demoBoard);
+    return res.status(201).json(demoBoard);
+  }
 });
 
 // Get status and full result of a board

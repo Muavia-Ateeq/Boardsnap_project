@@ -45,7 +45,7 @@ boardsnap/
 │   └── package.json
 │
 ├── vision/             # Computer Vision & ML services (Muavia)
-│   ├── main.py         # OpenCV cleanup, PyTorch detector & spatial graph builder
+│   ├── main.py         # OpenCV cleanup, Roboflow detection, TrOCR & spatial graph builder
 │   └── requirements.txt
 │
 ├── llm/                # Grounded language & RAG services (Awais)
@@ -89,6 +89,14 @@ cd vision
 pip install -r requirements.txt
 uvicorn main:app --port 8000 --reload
 ```
+
+The Node backend calls the vision service at `http://localhost:8000` by default.
+Set `VISION_SERVICE_URL` if it is hosted elsewhere. To use hosted region
+detection, set `ROBOFLOW_API_KEY` before starting the vision service; without a
+key, its detect endpoint returns demo regions. Image uploads run through clean,
+detect, OCR, and graph generation. If the vision service is unreachable or a
+step fails, the backend returns the existing demo result with
+`processingMode: "demo"` and a `pipelineWarning`.
 
 ### 4. Download an annotated whiteboard dataset
 

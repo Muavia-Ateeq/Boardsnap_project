@@ -33,10 +33,12 @@ import math
 import os
 import time
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
@@ -45,6 +47,9 @@ from pydantic import BaseModel
 # ── logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger("boardsnap.vision")
+
+# Load Vision-local settings without overriding variables already set by the shell.
+load_dotenv(Path(__file__).with_name(".env"), override=False)
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 app = FastAPI(title="BoardSnap Vision Service", version="2.0.0")
@@ -270,72 +275,118 @@ def clean_whiteboard(raw_bytes: bytes) -> Tuple[np.ndarray, dict]:
 #  HELPERS – ROBOFLOW INFERENCE
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 def _roboflow_detect(image_b64: str, model_id: str, api_key: str) -> List[RegionItem]:
-    """
-    Call Roboflow hosted inference API.
-    Returns list of RegionItem.
-    Docs: https://docs.roboflow.com/deploy/hosted-api/object-detection
-    """
-    import requests  # already available via fastapi ecosystem
+    """Call the BoardSnap YOLO-World workflow on Roboflow."""
+    import os
+    import requests
 
-    url = f"https://detect.roboflow.com/{model_id}"
-    params = {"api_key": api_key, "confidence": 30, "overlap": 45}
+    url = os.environ.get("ROBOFLOW_WORKFLOW_URL", "").strip()
 
-    # Send as raw base64 in the request body
+    if not url:
+        raise ValueError("ROBOFLOW_WORKFLOW_URL is missing from vision/.env")
+
+    # Remove an optional image data-URL prefix, if present.
+    if image_b64.startswith("data:") and "," in image_b64:
+        image_b64 = image_b64.split(",", 1)[1]
+
+    payload = {
+        "inputs": {
+            "image": {
+                "type": "base64",
+                "value": image_b64,
+            },
+            "classes": "box, arrow, diamond, whiteboard, handwriting",
+        }
+    }
+
     resp = requests.post(
         url,
-        params=params,
-        data=base64.b64decode(image_b64),
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        timeout=30,
+        json=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        timeout=60,
     )
+
+    if not resp.ok:
+        log.error(
+            "YOLO-World workflow HTTP %s: %s",
+            resp.status_code,
+            resp.text[:1000],
+        )
+
     resp.raise_for_status()
     data = resp.json()
+    log.info("YOLO-World raw response: %s", str(data)[:4000])
+    # Workflow results may nest predictions inside "predictions".
+    outputs = data.get("outputs", [])
+
+    if outputs and isinstance(outputs[0], dict):
+        result = outputs[0].get("predictions", {})
+    else:
+        result = data.get("predictions", data)
+
+    if isinstance(result, dict):
+        img_info = result.get("image", {})
+        predictions = result.get("predictions", [])
+    else:
+        img_info = data.get("image", {})
+        predictions = result
+
+    log.info("YOLO-World prediction count: %s", len(predictions))
+
+    img_w = img_info.get("width", 1) or 1
+    img_h = img_info.get("height", 1) or 1
+
+    type_map = {
+        "whiteboard": "box",
+        "box": "box",
+        "handwriting": "text",
+        "text": "text",
+        "arrow": "arrow",
+        "diamond": "diamond",
+    }
 
     regions: List[RegionItem] = []
-    img_w = data.get("image", {}).get("width", 1) or 1
-    img_h = data.get("image", {}).get("height", 1) or 1
 
-    for i, pred in enumerate(data.get("predictions", [])):
-        # Roboflow returns center x,y + width/height in pixels
-        cx, cy = pred["x"], pred["y"]
-        pw, ph = pred["width"], pred["height"]
+    for i, pred in enumerate(predictions):
+        confidence = float(pred.get("confidence", 0))
+        class_name = pred.get("class", "text").lower()
+
+        cx = float(pred["x"])
+        cy = float(pred["y"])
+        pw = float(pred["width"])
+        ph = float(pred["height"])
+
         x_pct = max(0.0, (cx - pw / 2) / img_w * 100)
         y_pct = max(0.0, (cy - ph / 2) / img_h * 100)
         w_pct = min(100.0, pw / img_w * 100)
         h_pct = min(100.0, ph / img_h * 100)
 
-        class_name = pred.get("class", "text").lower()
-        # Map Roboflow classes → our internal types
-        type_map = {
-            "whiteboard": "box",
-            "pen": "text",
-            "handwriting": "text",
-            "arrow": "arrow",
-            "decision": "diamond",
-            "process": "box",
-            "terminator": "box",
-            "connection": "arrow",
-            "data": "parallelogram",
-        }
-        region_type = type_map.get(class_name, "text")
-
         regions.append(
             RegionItem(
-                id=f"r{i+1}",
-                type=region_type,
-                box=[round(x_pct, 2), round(y_pct, 2), round(w_pct, 2), round(h_pct, 2)],
+                id=f"r{i + 1}",
+                type=type_map.get(class_name, "text"),
+                box=[
+                    round(x_pct, 2),
+                    round(y_pct, 2),
+                    round(w_pct, 2),
+                    round(h_pct, 2),
+                ],
                 label=class_name.title(),
-                confidence=round(pred.get("confidence", 0.9), 3),
+                confidence=round(confidence, 3),
             )
         )
 
+    log.info("YOLO-World detected %s regions", len(regions))
     return regions
 
 
-def _fallback_regions() -> List[RegionItem]:
-    """Return hardcoded demo regions when Roboflow key is missing."""
-    log.warning("ROBOFLOW_API_KEY not set – using fallback demo regions.")
+def _fallback_regions(reason: str) -> List[RegionItem]:
+    """Return hardcoded demo regions when hosted detection is unavailable."""
+    log.warning("%s – using fallback demo regions.", reason)
     return [
         RegionItem(id="r1", type="text",  box=[5,  5,  40, 10], label="Distributed Event Pipeline", confidence=0.96),
         RegionItem(id="r2", type="box",   box=[5,  25, 22, 14], label="API Gateway",                confidence=0.94),
@@ -546,10 +597,14 @@ async def detect_regions(
             regions = _roboflow_detect(image_b64, ROBOFLOW_MODEL_ID, ROBOFLOW_API_KEY)
             log.info(f"Roboflow detected {len(regions)} regions")
         except Exception as exc:
-            log.warning(f"Roboflow call failed ({exc}), using fallback regions")
-            regions = _fallback_regions()
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            if status_code:
+                reason = f"Roboflow request failed (HTTP {status_code})"
+            else:
+                reason = f"Roboflow request failed ({type(exc).__name__})"
+            regions = _fallback_regions(reason)
     else:
-        regions = _fallback_regions()
+        regions = _fallback_regions("ROBOFLOW_API_KEY is missing")
 
     return {"regions": [r.model_dump() for r in regions]}
 

@@ -8,7 +8,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const VISION_SERVICE_URL = (process.env.VISION_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
 const VISION_REQUEST_TIMEOUT_MS = Number(process.env.VISION_REQUEST_TIMEOUT_MS || 300000);
-
+const LLM_SERVICE_URL = (
+  process.env.LLM_SERVICE_URL || 'http://localhost:8001'
+).replace(/\/+$/, '');
 app.use(cors());
 app.use(express.json());
 
@@ -42,6 +44,29 @@ async function postVisionForm(endpoint, formData) {
   if (!payload) {
     throw new Error(`Vision service ${endpoint} returned an invalid response`);
   }
+  return payload;
+}
+
+async function postLlmJson(endpoint, body) {
+  const response = await fetch(`${LLM_SERVICE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120000),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.detail || `LLM service ${endpoint} failed (${response.status})`
+    );
+  }
+
+  if (payload === null) {
+    throw new Error(`LLM service ${endpoint} returned an invalid response`);
+  }
+
   return payload;
 }
 
@@ -171,6 +196,13 @@ app.post('/api/boards', upload.single('image'), async (req, res) => {
 
     let regions = [];
     let diagram = { nodes: [], edges: [], mermaid: '' };
+    let notes = {
+  title: 'No readable whiteboard content',
+  keyPoints: [],
+  definitions: [],
+  actionItems: [],
+};
+let quiz = [];
     if (cleaned.isQualityPass) {
       const detectForm = new FormData();
       detectForm.append('clean_image_b64', cleaned.cleanImageB64);
@@ -194,6 +226,14 @@ app.post('/api/boards', upload.single('image'), async (req, res) => {
       if (!Array.isArray(diagram.nodes) || !Array.isArray(diagram.edges) || typeof diagram.mermaid !== 'string') {
         throw new Error('Vision service /vision/graph response is invalid');
       }
+      notes = await postLlmJson('/llm/notes', {
+  regions,
+  diagram,
+});
+
+quiz = await postLlmJson('/llm/quiz', {
+  notes,
+});
     }
 
     const newBoard = {
@@ -208,6 +248,8 @@ app.post('/api/boards', upload.single('image'), async (req, res) => {
       cleanImageUrl,
       regions,
       diagram,
+      notes,
+quiz,
       processingMode: 'vision',
     };
 
@@ -237,51 +279,66 @@ app.get('/api/boards/:id', (req, res) => {
 });
 
 // Regenerate quiz questions
-app.post('/api/boards/:id/quiz', (req, res) => {
-  const board = boardsDb.get(req.params.id) || SAMPLE_BOARD;
-  const freshQuiz = [
-    {
-      id: `q_fresh_${Date.now()}_1`,
-      q: "Which component decouples ingest traffic spikes from the worker pool?",
-      options: ["Postgres Database", "Kafka / Redis Buffer", "FastAPI Router", "Dead Letter Queue"],
-      correctIndex: 1,
-      a: "The Kafka / Redis partitioned buffer acts as a shock absorber between ingest and processing."
-    },
-    {
-      id: `q_fresh_${Date.now()}_2`,
-      q: "What is the retry threshold before forwarding an event to the Dead Letter Queue?",
-      options: ["1 retry", "3 retries", "10 retries", "Infinite retries"],
-      correctIndex: 1,
-      a: "The whiteboard explicitly sets 'Retry limit = 3'."
+
+app.post('/api/boards/:id/quiz', async (req, res) => {
+  try {
+    const board = boardsDb.get(req.params.id);
+
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found' });
     }
-  ];
-  board.quiz = freshQuiz;
-  boardsDb.set(board.id, board);
-  res.json(freshQuiz);
+
+    const quiz = await postLlmJson('/llm/quiz', {
+      notes: board.notes,
+    });
+
+    board.quiz = quiz;
+    boardsDb.set(board.id, board);
+
+    return res.json(quiz);
+  } catch (error) {
+    console.error('[BoardSnap] Quiz generation failed:', error.message);
+    return res.status(502).json({
+      error: 'Could not generate quiz questions',
+      detail: error.message,
+    });
+  }
 });
+
 
 // Chat over saved boards (RAG)
-app.post('/api/chat', (req, res) => {
-  const { boardId, query } = req.body;
-  const board = boardsDb.get(boardId) || SAMPLE_BOARD;
 
-  const qLower = (query || '').toLowerCase();
-  let answer = "According to this whiteboard, the system processes streaming events through an asynchronous pipeline with guaranteed delivery and retry boundaries.";
-  let source = "Board Graph & OCR Blocks";
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { boardId, query } = req.body || {};
+    const board = boardsDb.get(boardId);
 
-  if (qLower.includes("dlq") || qLower.includes("dead letter")) {
-    answer = "The Dead Letter Queue (DLQ) isolates messages that fail 3 retry attempts. A PagerDuty alert triggers when depth exceeds 100.";
-    source = "Region #8 (DLQ Box) & Region #9 (Requirements)";
-  } else if (qLower.includes("latency") || qLower.includes("fast")) {
-    answer = "The ingestion latency target is under 500ms at the FastAPI gateway layer.";
-    source = "Region #9 (Requirements, Bullet 2)";
-  } else if (qLower.includes("action") || qLower.includes("todo") || qLower.includes("next")) {
-    answer = "Action items: (1) Configure PagerDuty webhooks, (2) Benchmark Celery throughput at 5k req/s, and (3) Add idempotent write checks.";
-    source = "Grounded Notes: Action Items Section";
+    if (!board) {
+      return res.status(404).json({ error: 'Board not found' });
+    }
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'A question is required' });
+    }
+
+    const result = await postLlmJson('/llm/chat', {
+      board_id: boardId,
+      query,
+      regions: board.regions || [],
+      diagram: board.diagram || null,
+      notes: board.notes || null,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error('[BoardSnap] Chat failed:', error.message);
+    return res.status(502).json({
+      error: 'Could not answer the question',
+      detail: error.message,
+    });
   }
-
-  res.json({ answer, source });
 });
+
 
 // Export notes (markdown or pdf format)
 app.get('/api/boards/:id/export', (req, res) => {

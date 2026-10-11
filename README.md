@@ -90,10 +90,15 @@ pip install -r requirements.txt
 uvicorn main:app --port 8000 --reload
 ```
 
+Before starting it, copy `vision/.env.example` to `vision/.env` and add your
+Roboflow private API key as `ROBOFLOW_API_KEY`. The Vision service loads this
+file automatically; `.env` is ignored by Git, so each teammate must provide
+their own key. `ROBOFLOW_MODEL_ID` can be changed there to match the model and
+version shown in Roboflow's Hosted API page.
+
 The Node backend calls the vision service at `http://localhost:8000` by default.
-Set `VISION_SERVICE_URL` if it is hosted elsewhere. To use hosted region
-detection, set `ROBOFLOW_API_KEY` before starting the vision service; without a
-key, its detect endpoint returns demo regions. Image uploads run through clean,
+Set `VISION_SERVICE_URL` if it is hosted elsewhere. Without a Roboflow key,
+the detect endpoint returns demo regions. Image uploads run through clean,
 detect, OCR, and graph generation. If the vision service is unreachable or a
 step fails, the backend returns the existing demo result with
 `processingMode: "demo"` and a `pipelineWarning`.

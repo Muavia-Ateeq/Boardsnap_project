@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { HelpCircle, CheckCircle2, XCircle, RotateCcw, Sparkles, BookOpen, Eye } from 'lucide-react';
 
-export function QuizSection({ quiz, onRegenerateQuiz, isRegenerating }) {
+export function QuizSection({ quiz, onRegenerateQuiz, isRegenerating, error = '' }) {
   const [userAnswers, setUserAnswers] = useState({});
   const [revealedAnswers, setRevealedAnswers] = useState({});
   const [isFlashcardMode, setIsFlashcardMode] = useState(false);
   const [flippedCards, setFlippedCards] = useState({});
 
-  if (!quiz || quiz.length === 0) return null;
+  if (!quiz) return null;
 
   const handleSelectOption = (qId, optionIndex) => {
     setUserAnswers(prev => ({ ...prev, [qId]: optionIndex }));
@@ -47,6 +47,12 @@ export function QuizSection({ quiz, onRegenerateQuiz, isRegenerating }) {
           </p>
         </div>
 
+        {error && (
+          <p role="alert" className="mb-5 rounded-lg border-2 border-ink bg-red-100 px-3 py-2 text-xs font-bold text-ink">
+            {error}
+          </p>
+        )}
+
         {/* Actions & Score */}
         <div className="flex items-center gap-3">
           {answeredCount > 0 && !isFlashcardMode && (
@@ -79,7 +85,11 @@ export function QuizSection({ quiz, onRegenerateQuiz, isRegenerating }) {
       </div>
 
       {/* Mode 1: Interactive Multiple-Choice Quiz */}
-      {!isFlashcardMode ? (
+      {quiz.length === 0 ? (
+        <p className="rounded-lg border-2 border-ink bg-cream-100 px-4 py-5 text-sm font-mono text-ink">
+          No quiz questions were generated for this board yet. Use Regenerate to try again.
+        </p>
+      ) : !isFlashcardMode ? (
         <div className="space-y-6">
           {quiz.map((item, idx) => {
             const chosen = userAnswers[item.id];

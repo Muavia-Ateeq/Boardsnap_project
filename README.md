@@ -41,7 +41,9 @@ boardsnap/
 │   └── package.json
 │
 ├── backend/            # Express.js REST API & Agent Orchestrator (Ammar)
-│   ├── server.js       # Pipeline runner, file uploads, quiz & export routes
+│   ├── server.js       # API startup and graceful shutdown
+│   ├── src/            # Routes, pipeline, MongoDB/in-memory repository, service clients
+│   ├── test/           # API and end-to-end pipeline contract tests
 │   └── package.json
 │
 ├── vision/             # Computer Vision & ML services (Muavia)
@@ -79,11 +81,16 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ```bash
 cd backend
 npm install
+# Copy .env.example to .env and configure service URLs / MongoDB if needed
 npm run dev
 ```
-Runs the orchestration server on [http://localhost:5000](http://localhost:5000).
+Runs the orchestration API on [http://localhost:5000](http://localhost:5000). Without
+`MONGODB_URI`, boards are kept in memory for local development and are lost when
+the server restarts. Set `MONGODB_URI` to enable MongoDB persistence. Uploaded
+images are stored in `backend/uploads` by default; production deployments need
+a persistent disk or a configured `UPLOAD_DIR`.
 
-### 3. Run the Vision & ML Service (Optional local microservice)
+### 3. Run the Vision & ML Service
 ```bash
 cd vision
 pip install -r requirements.txt
@@ -96,14 +103,35 @@ file automatically; `.env` is ignored by Git, so each teammate must provide
 their own key. `ROBOFLOW_MODEL_ID` can be changed there to match the model and
 version shown in Roboflow's Hosted API page.
 
-The Node backend calls the vision service at `http://localhost:8000` by default.
-Set `VISION_SERVICE_URL` if it is hosted elsewhere. Without a Roboflow key,
-the detect endpoint returns demo regions. Image uploads run through clean,
-detect, OCR, and graph generation. If the vision service is unreachable or a
-step fails, the backend returns the existing demo result with
-`processingMode: "demo"` and a `pipelineWarning`.
+The backend calls the vision service at `http://localhost:8000` and the language
+service at `http://localhost:8001` by default. Configure `VISION_SERVICE_URL`
+and `LLM_SERVICE_URL` in `backend/.env` when these services are hosted elsewhere.
+To use hosted region detection, configure `ROBOFLOW_API_KEY` in `vision/.env`;
+without a key, its detect endpoint returns demo regions. An image
+upload returns a queued board, then the frontend polls `GET /api/boards/:id`
+while the backend runs cleanup, detection, OCR, graph construction, grounded
+notes, and quiz generation. A quality-gate rejection completes with
+`isQualityPass: false` so the UI can ask for a retake. Service or pipeline
+failures are reported with `status: "failed"` and an error; they are not
+replaced by fabricated sample-board results.
 
-### 4. Download an annotated whiteboard dataset
+The public API also includes `POST /api/boards/:id/quiz`, `POST /api/chat`,
+`GET /api/boards/:id/export?format=md`, and `GET /api/health`. Run backend
+contract tests with `cd backend && npm test`.
+
+### 4. Run the Language Service
+```bash
+cd llm
+pip install -r requirements.txt
+# Set GEMINI_API_KEY in this shell before starting the service
+uvicorn main:app --port 8001 --reload
+```
+
+The language service requires a Gemini API key. Without it, notes and quiz
+generation return a service error and the board job will be marked `failed`
+instead of returning unrelated sample content.
+
+### 5. Download an annotated whiteboard dataset
 
 The downloader fetches two separate public Roboflow Universe datasets in YOLOv8
 format, including their annotations and native train/valid/test splits:

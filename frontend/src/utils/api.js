@@ -1,12 +1,25 @@
 import { sampleBoards } from '../data/sampleBoards';
 
 const API_BASE = '/api';
+const BOARD_POLL_INTERVAL_MS = 1000;
+const BOARD_PROCESSING_TIMEOUT_MS = 10 * 60 * 1000;
+
+function createAbortSignal(timeoutMs) {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(timeoutMs);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  controller.signal.addEventListener('abort', () => clearTimeout(timeoutId), { once: true });
+  return controller.signal;
+}
 
 export const apiService = {
   // Check if live backend server is reachable
   async checkBackendHealth() {
     try {
-      const res = await fetch(`${API_BASE}/health`, { method: 'GET', signal: AbortSignal.timeout(2000) });
+      const res = await fetch(`${API_BASE}/health`, { method: 'GET', signal: createAbortSignal(2000) });
       return res.ok;
     } catch {
       return false;
@@ -24,21 +37,44 @@ export const apiService = {
     }
 
     // Try live API first if it's a file
+    let response;
     try {
       const formData = new FormData();
       formData.append('image', fileOrSampleId);
 
-      const res = await fetch(`${API_BASE}/boards`, {
+      response = await fetch(`${API_BASE}/boards`, {
         method: 'POST',
         body: formData,
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        return data;
-      }
     } catch (e) {
       console.warn("Live backend unreachable, falling back to client-side pipeline simulation:", e);
+    }
+
+    if (response) {
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || error.error || `Board upload failed (${response.status}).`);
+      }
+
+      let board = await response.json();
+      const deadline = Date.now() + BOARD_PROCESSING_TIMEOUT_MS;
+      while (board.status === 'queued' || board.status === 'processing') {
+        if (board.progress && onProgress) onProgress(board.progress);
+        if (Date.now() >= deadline) {
+          throw new Error('Board processing timed out. Please try again.');
+        }
+        await new Promise(resolve => setTimeout(resolve, BOARD_POLL_INTERVAL_MS));
+        const statusResponse = await fetch(`${API_BASE}/boards/${encodeURIComponent(board.id)}`);
+        if (!statusResponse.ok) {
+          const error = await statusResponse.json().catch(() => ({}));
+          throw new Error(error.error || `Could not retrieve board status (${statusResponse.status}).`);
+        }
+        board = await statusResponse.json();
+      }
+      if (board.status === 'failed') {
+        throw new Error(board.error || 'Board processing failed. Please try again.');
+      }
+      return board;
     }
 
     // Fallback: Client-side image processing simulation
@@ -86,11 +122,20 @@ export const apiService = {
 
   // Regenerate Quiz
   async regenerateQuiz(boardId) {
-    try {
-      const res = await fetch(`${API_BASE}/boards/${boardId}/quiz`, { method: 'POST' });
-      if (res.ok) return await res.json();
-    } catch {
-      // Fallback
+    let response;
+    if (!sampleBoards.some(board => board.id === boardId)) {
+      try {
+        response = await fetch(`${API_BASE}/boards/${encodeURIComponent(boardId)}/quiz`, { method: 'POST' });
+      } catch {
+        // Use sample data only when the API cannot be reached.
+      }
+    }
+    if (response) {
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || error.error || `Quiz generation failed (${response.status}).`);
+      }
+      return response.json();
     }
     const board = sampleBoards.find(b => b.id === boardId) || sampleBoards[0];
     return board.quiz;
@@ -98,15 +143,24 @@ export const apiService = {
 
   // Chat over saved boards
   async chatWithBoard(boardId, query) {
-    try {
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ boardId, query })
-      });
-      if (res.ok) return await res.json();
-    } catch {
-      // Fallback
+    let response;
+    if (!sampleBoards.some(board => board.id === boardId)) {
+      try {
+        response = await fetch(`${API_BASE}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ boardId, query })
+        });
+      } catch {
+        // Use sample data only when the API cannot be reached.
+      }
+    }
+    if (response) {
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || error.error || `Board chat failed (${response.status}).`);
+      }
+      return response.json();
     }
 
     // Client-side grounded answering based on query

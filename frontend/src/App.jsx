@@ -17,9 +17,11 @@ export default function App() {
   const [currentBoard, setCurrentBoard] = useState(sampleBoards[0]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(null);
+  const [processingError, setProcessingError] = useState('');
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
   const [isRegeneratingQuiz, setIsRegeneratingQuiz] = useState(false);
+  const [quizError, setQuizError] = useState('');
 
   // Check backend health on mount
   useEffect(() => {
@@ -33,6 +35,7 @@ export default function App() {
   // Process a board (file or sample ID)
   const handleProcessBoard = async (fileOrId) => {
     setIsProcessing(true);
+    setProcessingError('');
     setProgress({ currentStep: 1, totalSteps: 6 });
 
     try {
@@ -42,6 +45,7 @@ export default function App() {
       setCurrentBoard(processed);
     } catch (err) {
       console.error("Processing error:", err);
+      setProcessingError(err instanceof Error ? err.message : 'Board processing failed. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -51,11 +55,13 @@ export default function App() {
   const handleRegenerateQuiz = async () => {
     if (!currentBoard) return;
     setIsRegeneratingQuiz(true);
+    setQuizError('');
     try {
       const newQuiz = await apiService.regenerateQuiz(currentBoard.id);
       setCurrentBoard(prev => ({ ...prev, quiz: newQuiz }));
     } catch (err) {
       console.error("Quiz regenerate failed:", err);
+      setQuizError(err instanceof Error ? err.message : 'Quiz generation failed.');
     } finally {
       setIsRegeneratingQuiz(false);
     }
@@ -82,6 +88,12 @@ export default function App() {
         {/* Live Processing Pipeline Ticker */}
         {isProcessing && (
           <ProcessingPipeline progress={progress} />
+        )}
+
+        {processingError && (
+          <div role="alert" className="mb-8 rounded-xl border-2 border-ink bg-red-100 px-4 py-3 text-sm font-bold text-ink shadow-retro-sm">
+            {processingError}
+          </div>
         )}
 
         {/* Quality Gate Rejection Banner (For dark / glare / blurry photos) */}
@@ -123,6 +135,7 @@ export default function App() {
                 quiz={currentBoard.quiz}
                 onRegenerateQuiz={handleRegenerateQuiz}
                 isRegenerating={isRegeneratingQuiz}
+                error={quizError}
               />
             )}
 

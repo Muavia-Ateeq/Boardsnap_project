@@ -43,7 +43,7 @@ export function RAGChatSection({ boardId, boardName }) {
         ...prev,
         {
           role: 'assistant',
-          content: "Sorry, error querying the board index.",
+          content: err instanceof Error ? `Sorry, ${err.message}` : "Sorry, error querying the board index.",
           source: "Error"
         }
       ]);

@@ -71,6 +71,7 @@ ROBOFLOW_OCR_WORKFLOW_URL = os.environ.get(
     "https://serverless.roboflow.com/moyeon-abrar/workflows/qwen-vl",
 ).strip()
 ALLOW_DEMO_DETECTOR_FALLBACK = os.environ.get("ALLOW_DEMO_DETECTOR_FALLBACK", "").lower() == "true"
+ALLOW_LOCAL_OCR_FALLBACK = os.environ.get("ALLOW_LOCAL_OCR_FALLBACK", "true").lower() == "true"
 TROCR_MODEL_ID = os.environ.get("TROCR_MODEL_ID", "microsoft/trocr-base-handwritten")
 
 # ── lazy TrOCR loader (loaded once on first call) ─────────────────────────────
@@ -767,6 +768,8 @@ def _build_graph(regions: List[Dict[str, Any]]) -> Tuple[list, list, str]:
 @app.get("/health")
 def health():
     roboflow_ocr_configured = bool(ROBOFLOW_API_KEY and ROBOFLOW_OCR_WORKFLOW_URL)
+    easyocr_installed = importlib.util.find_spec("easyocr") is not None
+    local_ocr_available = ALLOW_LOCAL_OCR_FALLBACK and easyocr_installed
     return {
         "status": "ok",
         "service": "BoardSnap Vision & ML Service",
@@ -776,12 +779,14 @@ def health():
             "fallback_enabled": ALLOW_DEMO_DETECTOR_FALLBACK,
         },
         "ocr": {
-            "provider": "Roboflow Qwen-VL" if roboflow_ocr_configured else "EasyOCR fallback",
-            "workflow_configured": roboflow_ocr_configured,
-            "dependencies_installed": bool(
-                importlib.util.find_spec("torch")
-                and importlib.util.find_spec("transformers")
+            "provider": (
+                "Roboflow Qwen-VL"
+                if roboflow_ocr_configured
+                else "EasyOCR fallback" if local_ocr_available else "unavailable"
             ),
+            "workflow_configured": roboflow_ocr_configured,
+            "dependencies_installed": easyocr_installed,
+            "local_fallback_enabled": ALLOW_LOCAL_OCR_FALLBACK,
             "model_loaded": _trocr_model is not None,
         },
         "trocr_loaded": _trocr_processor is not None,
@@ -897,19 +902,25 @@ async def read_text_regions(
 
         return {"regions": regions, "model": "Roboflow Qwen-VL"}
 
-    if not importlib.util.find_spec("torch") or not importlib.util.find_spec("transformers"):
+    if not ALLOW_LOCAL_OCR_FALLBACK:
         raise HTTPException(
             status_code=503,
-            detail="OCR dependencies are not installed. Install vision/requirements.txt.",
+            detail="Local OCR fallback is disabled. Configure ROBOFLOW_API_KEY and ROBOFLOW_OCR_WORKFLOW_URL.",
+        )
+
+    if not importlib.util.find_spec("easyocr"):
+        raise HTTPException(
+            status_code=503,
+            detail="EasyOCR is not installed. Install vision/requirements.txt to enable local OCR.",
         )
 
     try:
         regions = _ocr_regions(regions, clean_image_b64)
     except Exception as exc:
-        log.exception("TrOCR failed to process the submitted regions")
+        log.exception("Local OCR failed to process the submitted regions")
         raise HTTPException(
             status_code=503,
-            detail="Handwriting OCR failed to load or process the image.",
+            detail="Local OCR failed to load or process the image.",
         ) from exc
 
     return {"regions": regions, "model": TROCR_MODEL_ID}

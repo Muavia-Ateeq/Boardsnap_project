@@ -76,7 +76,7 @@ boardsnap/
 
 ## 🚀 Quick Start & How to Run
 
-For Hugging Face backend and Vercel frontend deployment, follow the
+For Render Free backend and Vercel frontend deployment, follow the
 [beginner deployment guide](./docs/DEPLOYMENT.md).
 
 ### 1. Run the Frontend (React + Vite)

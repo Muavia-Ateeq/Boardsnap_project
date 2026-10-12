@@ -6,12 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=7860 \
     VISION_SERVICE_URL=http://127.0.0.1:8000 \
     LLM_SERVICE_URL=http://127.0.0.1:8001 \
+    ALLOW_LOCAL_OCR_FALLBACK=false \
     UPLOAD_DIR=/tmp/boardsnap-uploads
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
-        libgl1 \
         libglib2.0-0 \
         libgomp1 \
         nodejs \
@@ -23,10 +22,9 @@ RUN apt-get update \
 
 WORKDIR /home/user/app
 
-COPY vision/requirements.txt /tmp/vision-requirements.txt
+COPY vision/requirements-deploy.txt /tmp/vision-requirements.txt
 COPY llm/requirements.txt /tmp/llm-requirements.txt
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch torchvision \
     && pip install --no-cache-dir -r /tmp/vision-requirements.txt -r /tmp/llm-requirements.txt
 
 COPY backend/package.json backend/package-lock.json ./backend/

@@ -117,11 +117,12 @@ class VisionTests(unittest.TestCase):
             with self.assertRaises(ModuleNotFoundError):
                 main._trocr_read(Image.new("RGB", (30, 20), "white"))
 
-    def test_ocr_endpoint_reports_model_failure(self):
+    def test_ocr_endpoint_reports_local_fallback_failure(self):
         region = {"id": "r1", "type": "text", "box": [0, 0, 50, 50]}
         with (
             patch.object(main, "ROBOFLOW_API_KEY", ""),
             patch.object(main, "ROBOFLOW_OCR_WORKFLOW_URL", ""),
+            patch.object(main, "ALLOW_LOCAL_OCR_FALLBACK", True),
             patch.object(main.importlib.util, "find_spec", return_value=object()),
             patch.object(main, "_ocr_regions", side_effect=RuntimeError("model failed")),
         ):
@@ -131,6 +132,21 @@ class VisionTests(unittest.TestCase):
                     clean_image_b64=self.image_base64(),
                 ))
         self.assertEqual(caught.exception.status_code, 503)
+
+    def test_ocr_endpoint_rejects_disabled_local_fallback(self):
+        region = {"id": "r1", "type": "text", "box": [0, 0, 50, 50]}
+        with (
+            patch.object(main, "ROBOFLOW_API_KEY", ""),
+            patch.object(main, "ROBOFLOW_OCR_WORKFLOW_URL", ""),
+            patch.object(main, "ALLOW_LOCAL_OCR_FALLBACK", False),
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                asyncio.run(main.read_text_regions(
+                    regions_json=json.dumps([region]),
+                    clean_image_b64=self.image_base64(),
+                ))
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertIn("Local OCR fallback is disabled", caught.exception.detail)
 
     def test_roboflow_ocr_sends_full_image_once_and_appends_transcription(self):
         image_b64 = self.image_base64()

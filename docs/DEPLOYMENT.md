@@ -1,154 +1,147 @@
-# Beginner Deployment Guide
+# Free beginner deployment: Render backend + Vercel frontend
 
-This setup uses **one Hugging Face Docker Space for the complete backend**:
-the Node API and both Python services run inside the same container. The
-React/Vite frontend is deployed separately to Vercel. This keeps the service
-URLs and setup simpler than creating three backend Spaces.
+This setup hosts the combined Node/Python backend on a **Render Free web
+service** and the React/Vite frontend on Vercel. The project is already in the
+GitHub repository `Muavia-Ateeq/Boardsnap_project`.
 
-## Before you start
+Render supports Docker web services on its Free plan. This Docker build omits
+the large local PyTorch/EasyOCR stack: deployed OCR and detection use the
+configured hosted Roboflow workflows. The full local OCR dependencies remain
+available for development in `vision/requirements.txt`.
 
-Have these accounts/configuration ready:
+## Free-plan limitations
 
-- Hugging Face account.
-- Git installed and configured on your computer.
-- Roboflow API key and the full inference URL for your detection workflow.
-- An API key for one supported LLM provider. The steps below use Groq.
-- MongoDB Atlas connection string if board records must survive restarts.
+Render Free is for hobby projects and testing, not production:
 
-Do not put API keys in GitHub, source files, screenshots, or chat. Add them only
-as Hugging Face Space secrets.
+- The backend spins down after 15 minutes without traffic; its first request
+  after sleeping can take about a minute.
+- Its filesystem is temporary. Uploaded images are lost when the service
+  restarts, redeploys, or spins down.
+- Without `MONGODB_URI`, board records are kept in memory and are also lost
+  when the service restarts.
+- A free deployment is not guaranteed to meet every resource need. If Render
+  reports that the service exceeded its resources, stop and share the relevant
+  deploy/runtime log rather than upgrading or adding a payment method.
+- Hosting may be free, but external providers such as Roboflow, Groq, Gemini,
+  and MongoDB have their own quotas and billing terms.
 
-## 1. Create the Hugging Face Space
+For durable image storage, add an object-storage provider later. MongoDB alone
+does not preserve uploaded image files.
 
-1. Sign in at [Hugging Face](https://huggingface.co/).
-2. Open **Spaces** and choose **Create new Space**.
-3. Choose a Space name, for example `boardsnap-api`.
-4. Choose **Docker** as the Space SDK. The repository already includes a
-   `Dockerfile` and Space metadata in the root `README.md`.
-5. Choose Public or Private, accept the terms, and create the Space.
+## Before starting
 
-The Space URL will look like:
+Have these ready:
 
-```text
-https://YOUR-HF-USERNAME-boardsnap-api.hf.space
-```
+- Access to the GitHub repository `Muavia-Ateeq/Boardsnap_project`.
+- A Render account and a Vercel account.
+- A Roboflow API key and the full detection workflow URL.
+- A Groq API key. You can use another supported LLM provider instead, but the
+  steps below configure Groq.
+- Optionally, a MongoDB Atlas connection string for board-record persistence.
 
-Use the URL shown on your Space page; do not guess it.
+Never commit a key to GitHub or paste one into chat. Add keys only to the
+hosting provider's environment-variable settings.
 
-## 2. Copy the project into the Space repository
+## 1. Deploy the backend on Render
 
-Open PowerShell and replace `YOUR-HF-USERNAME` and the Space name below. This
-clones the new Space repository, copies the project files without copying local
-Git data or local dependencies, then pushes the files to Hugging Face:
+1. Sign in to [Render](https://render.com/) and choose **New → Web Service**.
+2. Connect GitHub if asked, then select
+   `Muavia-Ateeq/Boardsnap_project` and the `main` branch.
+3. Configure the service:
+   - **Runtime / Language:** Docker
+   - **Dockerfile path:** `./Dockerfile`
+   - **Root directory:** leave blank
+   - **Instance type:** Free
+   - **Health check path:** `/api/health`
+4. Add the environment variables below. Enter API keys as secret values.
 
-```powershell
-git clone https://huggingface.co/spaces/YOUR-HF-USERNAME/boardsnap-api "$HOME\boardsnap-hf"
-robocopy "E:\BoardSnap-hackathon" "$HOME\boardsnap-hf" /E /XD .git node_modules .venv dist uploads roboflow /XF .env
-Set-Location "$HOME\boardsnap-hf"
-git add -A
-git commit -m "Deploy BoardSnap backend"
-git push
-```
+   | Name | Value |
+   | --- | --- |
+   | `LLM_PROVIDER` | `groq` |
+   | `GROQ_MODEL` | `openai/gpt-oss-120b` |
+   | `GROQ_API_KEY` | Your Groq API key (secret) |
+   | `ROBOFLOW_API_KEY` | Your Roboflow API key (secret) |
+   | `ROBOFLOW_WORKFLOW_URL` | Full detection workflow URL |
+   | `ROBOFLOW_OCR_WORKFLOW_URL` | Full OCR workflow URL |
+   | `CORS_ORIGIN` | `*` temporarily, until the frontend is deployed |
+   | `MONGODB_URI` | Optional Atlas connection string (secret) |
+   | `MONGODB_DATABASE` | `boardsnap` |
 
-When Git asks for credentials, use your Hugging Face username and a Hugging Face
-access token with **write** permission as the password. Create the token from
-your Hugging Face account settings. Type it only into Git's password prompt;
-do not add it to a command or file. If the first commit says there is nothing
-to commit, check that the `robocopy` command completed and the copied files
-include `Dockerfile` and `start.sh`.
+   `PORT`, the internal service URLs, and
+   `ALLOW_LOCAL_OCR_FALLBACK=false` are configured for the container. Do not
+   replace the Docker start command.
 
-## 3. Add Space variables and secrets
+5. Choose **Create Web Service** and wait for the first build and deploy to
+   finish. This image uses the smaller deployment dependency list, but its
+   first build may still take several minutes.
+6. Copy the Render URL shown on the service page. Check it in a browser by
+   opening:
 
-Open the Space's **Settings** page. Add these under **Variables and secrets**.
-Secrets are hidden values; ordinary variables are configuration values.
+   ```text
+   https://YOUR-RENDER-SERVICE.onrender.com/api/health
+   ```
 
-| Name | Type | Value |
-| --- | --- | --- |
-| `LLM_PROVIDER` | Variable | `groq` |
-| `GROQ_MODEL` | Variable | `openai/gpt-oss-120b` |
-| `GROQ_API_KEY` | Secret | Your Groq API key |
-| `ROBOFLOW_API_KEY` | Secret | Your Roboflow API key |
-| `ROBOFLOW_WORKFLOW_URL` | Secret | Full detection workflow inference URL |
-| `ROBOFLOW_OCR_WORKFLOW_URL` | Variable | Full OCR workflow URL |
-| `MONGODB_URI` | Secret | MongoDB Atlas connection string |
-| `MONGODB_DATABASE` | Variable | `boardsnap` |
-| `CORS_ORIGIN` | Variable | `*` for the first connection test; restrict it to your Vercel origin later |
+   A JSON response containing `"status":"ok"` means the API process is
+   responding. It does not verify your Roboflow/Groq keys; test a real image
+   after the frontend is connected.
 
-If you do not yet have MongoDB configured, leave `MONGODB_URI` unset for a
-short-lived smoke test. Board records will then be kept in memory and lost when
-the Space restarts.
+If deployment fails, open the Render service's **Events** or **Logs** and
+inspect the first build/runtime error. Do not share secret values when asking
+for help.
 
-After saving the settings, open **Logs** and wait for the Docker build and
-startup to finish. The startup log should report that the Vision service, LLM
-service, and API are running. The first build may take several minutes because
-the Vision image installs CPU PyTorch and OCR dependencies.
-
-## 4. Check the API
-
-Open this URL in a browser, replacing the username and Space name with the
-values shown on Hugging Face:
-
-```text
-https://YOUR-SPACE-URL/api/health
-```
-
-You should get JSON with `"status":"ok"`. If not, open **Logs** and resolve the
-reported build/startup error before configuring the frontend.
-
-## 5. Deploy the frontend to Vercel
+## 2. Deploy the frontend on Vercel
 
 1. Sign in to [Vercel](https://vercel.com/) and choose **Add New → Project**.
-2. Import `Muavia-Ateeq/Boardsnap_project` from GitHub.
+2. Import `Muavia-Ateeq/Boardsnap_project`.
 3. Set **Root Directory** to `frontend`.
-4. Use the Vite defaults: build command `npm run build`, output directory
-   `dist`, install command `npm install`.
-5. Before deploying, add an environment variable:
+4. Use:
+   - Build command: `npm run build`
+   - Output directory: `dist`
+   - Install command: `npm install`
+5. Add this environment variable before deploying:
 
    ```text
    Name: VITE_API_BASE_URL
-   Value: https://YOUR-SPACE-URL/api
+   Value: https://YOUR-RENDER-SERVICE.onrender.com/api
    ```
 
-6. Deploy and open the Vercel URL. The top badge should change to `API: LIVE`
-   when the API health check succeeds.
+6. Deploy and copy the Vercel site URL.
 
-After Vercel gives you the final site URL (for example,
-`https://boardsnap-project.vercel.app`), go back to Hugging Face Space Settings
-and change `CORS_ORIGIN` from `*` to that exact origin, without a trailing
-slash. Save/restart the Space, then redeploy or refresh the Vercel site.
+## 3. Restrict CORS to your deployed site
 
-If you use both a Vercel preview domain and a production domain, list both
-origins separated by a comma in `CORS_ORIGIN`.
-
-## 6. Configure durable storage before real use
-
-MongoDB stores board records, but original and cleaned images are written to
-the container filesystem. The Docker default upload directory is temporary.
-For files to survive Space restarts, enable persistent storage for the Space
-(if available for your plan) and set this Space variable:
+In Render, edit `CORS_ORIGIN` to the exact Vercel origin, without a trailing
+slash, for example:
 
 ```text
-UPLOAD_DIR=/data/uploads
+https://boardsnap-project.vercel.app
 ```
 
-Without persistent storage, treat uploads as temporary demo data. MongoDB Atlas
-must also allow connections from the deployed service; use a strong database
-user/password and grant access only to the required database.
+If you need both a preview and production domain, separate the exact origins
+with a comma. Save the change and wait for Render to redeploy. Keep `*` only
+for a temporary connectivity check.
+
+## 4. Check the connected app
+
+- Open the Vercel site and wait for the API status to report live. The first
+  request after Render has spun down may be slow.
+- Upload a test image. The Roboflow detector and OCR workflow must be
+  configured and reachable for image processing to complete.
+- If you set up MongoDB, verify that Atlas allows the deployed service to
+  connect. Without it, records are temporary.
+- Remember: Render Free has no persistent disk for this service, so uploaded
+  image previews can stop working after a restart or spin-down.
 
 ## Troubleshooting
 
-- **Space fails during build:** open the Space **Logs** and inspect the first
-  failed installation/build command.
-- **`/api/health` does not load:** make sure the Space finished starting and
-  check that the Space URL includes `/api/health`.
-- **Frontend says `API: DEMO MODE`:** check `VITE_API_BASE_URL`, ensure it ends
-  in `/api`, and redeploy Vercel after changing it.
-- **Browser reports a CORS error:** set `CORS_ORIGIN` to the exact Vercel
-  origin, save/restart the Space, and reload the site.
-- **Image previews are broken:** verify the deployed API has the uploaded
-  files. Temporary container storage is cleared on restart.
-- **Uploads fail:** the API default size limit is 10 MB. Check the Space logs
-  and the returned upload error.
-- **LLM or vision requests fail:** verify the provider keys and exact workflow
-  URLs in Space Settings. A running health endpoint does not prove those
-  third-party credentials are valid; test by processing a real image.
+- **Build fails:** inspect the first failed command in Render's deploy logs.
+- **Service fails its health check:** verify `/api/health` works on the
+  Render URL and check that the container started all three services.
+- **Frontend remains in demo mode:** confirm `VITE_API_BASE_URL` ends with
+  `/api`, then redeploy the Vercel project.
+- **CORS error:** set `CORS_ORIGIN` to the exact Vercel origin and wait for
+  Render to redeploy.
+- **Processing fails:** check that the Roboflow API key and both workflow
+  URLs are correct, and that the selected LLM provider key is valid.
+- **Render reports resource exhaustion:** share the relevant error/log text
+  without secrets. Do not assume the free service can run this workload until
+  its first deployment and image-processing request succeed.

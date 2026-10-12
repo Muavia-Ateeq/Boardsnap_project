@@ -86,6 +86,7 @@ before(async () => {
       llmRequestTimeoutMs: 2000,
       pipelineStepRetries: 1,
       maxUploadBytes: 1024 * 1024,
+      corsOrigin: 'https://frontend.example,https://preview.example',
       mongodbUri: '',
       uploadDir,
     },
@@ -152,6 +153,14 @@ test('image upload runs vision and language stages and serves board actions', as
   const exportResponse = await fetch(`${baseUrl}/api/boards/${board.id}/export?format=md`);
   assert.equal(exportResponse.status, 200);
   assert.match(await exportResponse.text(), /# Test board/);
+});
+
+test('health endpoint allows configured frontend origins', async () => {
+  const response = await fetch(`${baseUrl}/api/health`, {
+    headers: { Origin: 'https://frontend.example' },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('access-control-allow-origin'), 'https://frontend.example');
 });
 
 test('upload and lookup errors are explicit rather than demo successes', async () => {

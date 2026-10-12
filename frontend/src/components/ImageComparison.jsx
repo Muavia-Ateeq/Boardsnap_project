@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Layers, Eye, Sliders, CheckCircle, Crosshair, Sparkles, Maximize2 } from 'lucide-react';
+import { resolveApiAssetUrl } from '../utils/api';
 
 export function ImageComparison({ board }) {
   const [sliderPosition, setSliderPosition] = useState(50);
@@ -10,6 +11,8 @@ export function ImageComparison({ board }) {
   if (!board) return null;
 
   const regions = board.regions || [];
+  const rawImageUrl = resolveApiAssetUrl(board.rawImageUrl);
+  const cleanImageUrl = resolveApiAssetUrl(board.cleanImageUrl || board.rawImageUrl);
 
   return (
     <div className="retro-card p-6 mb-8 bg-white">
@@ -19,7 +22,7 @@ export function ImageComparison({ board }) {
           <div className="flex items-center gap-2">
             <h3 className="text-xl font-extrabold text-ink font-mono">Whiteboard Cleanup & AI Regions</h3>
             <span className="text-xs bg-banana-300 text-ink font-mono font-bold px-2.5 py-0.5 rounded-md border border-ink shadow-retro-sm">
-              OpenCV + Roboflow + TrOCR
+              OpenCV + Roboflow + EasyOCR
             </span>
           </div>
           <p className="text-xs text-ink-muted mt-0.5 font-medium">
@@ -99,7 +102,7 @@ export function ImageComparison({ board }) {
             </div>
             <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-900 border-2 border-ink shadow-retro-sm group">
               <img
-                src={board.rawImageUrl}
+                src={rawImageUrl}
                 alt="Raw Whiteboard"
                 className="w-full h-full object-cover filter contrast-90 brightness-95"
               />
@@ -122,7 +125,7 @@ export function ImageComparison({ board }) {
 
             <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-900 border-2 border-ink shadow-retro-sm group">
               <img
-                src={board.cleanImageUrl || board.rawImageUrl}
+                src={cleanImageUrl}
                 alt="Clean Whiteboard"
                 className="w-full h-full object-cover filter contrast-125 brightness-105"
               />
@@ -186,7 +189,7 @@ export function ImageComparison({ board }) {
         /* Slider View */
         <div className="relative aspect-[16/9] rounded-xl overflow-hidden bg-slate-900 border-2 border-ink select-none shadow-retro-sm">
           <img
-            src={board.cleanImageUrl || board.rawImageUrl}
+            src={cleanImageUrl}
             alt="Clean"
             className="absolute inset-0 w-full h-full object-cover filter contrast-125 brightness-105"
           />
@@ -196,7 +199,7 @@ export function ImageComparison({ board }) {
             style={{ width: `${sliderPosition}%` }}
           >
             <img
-              src={board.rawImageUrl}
+              src={rawImageUrl}
               alt="Raw"
               className="absolute inset-0 w-full h-full object-cover filter contrast-90 brightness-95 max-w-none"
               style={{ width: '100%', height: '100%' }}

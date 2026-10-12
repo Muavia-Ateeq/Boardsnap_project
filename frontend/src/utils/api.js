@@ -1,8 +1,21 @@
 import { sampleBoards } from '../data/sampleBoards';
 
-const API_BASE = '/api';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '');
 const BOARD_POLL_INTERVAL_MS = 1000;
 const BOARD_PROCESSING_TIMEOUT_MS = 10 * 60 * 1000;
+
+export function resolveApiAssetUrl(assetUrl) {
+  if (typeof assetUrl !== 'string' || !assetUrl.startsWith('/uploads/')) {
+    return assetUrl;
+  }
+
+  try {
+    const apiOrigin = new URL(API_BASE, window.location.origin).origin;
+    return new URL(assetUrl, apiOrigin).toString();
+  } catch {
+    return assetUrl;
+  }
+}
 
 function createAbortSignal(timeoutMs) {
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
@@ -48,6 +61,9 @@ export const apiService = {
       });
     } catch (e) {
       console.warn("Live backend unreachable, falling back to client-side pipeline simulation:", e);
+      if (!import.meta.env.DEV) {
+        throw new Error(`Could not reach the BoardSnap API: ${e.message}`);
+      }
     }
 
     if (response) {
@@ -75,6 +91,10 @@ export const apiService = {
         throw new Error(board.error || 'Board processing failed. Please try again.');
       }
       return board;
+    }
+
+    if (!import.meta.env.DEV) {
+      throw new Error('The BoardSnap API is unavailable. Please try again later.');
     }
 
     // Fallback: Client-side image processing simulation
@@ -126,8 +146,11 @@ export const apiService = {
     if (!sampleBoards.some(board => board.id === boardId)) {
       try {
         response = await fetch(`${API_BASE}/boards/${encodeURIComponent(boardId)}/quiz`, { method: 'POST' });
-      } catch {
+      } catch (error) {
         // Use sample data only when the API cannot be reached.
+        if (!import.meta.env.DEV) {
+          throw new Error(`Could not reach the BoardSnap API: ${error.message}`);
+        }
       }
     }
     if (response) {
@@ -151,8 +174,11 @@ export const apiService = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ boardId, query })
         });
-      } catch {
+      } catch (error) {
         // Use sample data only when the API cannot be reached.
+        if (!import.meta.env.DEV) {
+          throw new Error(`Could not reach the BoardSnap API: ${error.message}`);
+        }
       }
     }
     if (response) {

@@ -16,7 +16,7 @@ We realized that taking a photo of a whiteboard is where the learning journey cu
 ---
 
 ## What It Does (In 3 Sentences)
-BoardSnap lets students and engineering teams upload or capture any whiteboard photo from their phone or laptop. Using a 6-stage Computer Vision and Agentic pipeline, it straightens perspective, removes glare, separates handwritten text from diagrams, reconstructs hand-drawn arrows and boxes into interactive vector Mermaid flowcharts, and generates structured notes with zero hallucinations. It also synthesizes interactive multiple-choice quizzes, flashcards, and a searchable RAG store so users can ask questions directly about their saved whiteboards.
+BoardSnap lets students and engineering teams upload or capture a whiteboard photo from their phone or laptop. Its six-stage pipeline cleans and scores the image, calls configured hosted vision/OCR workflows, builds a heuristic Mermaid diagram, and asks a configurable LLM provider to draft notes and quiz questions from the extracted board content. Users can also ask questions using the current board as context.
 
 ---
 
@@ -28,63 +28,46 @@ We structured BoardSnap into a collaborative monorepo with distinct layers owned
    - Live WebRTC camera capture with custom alignment reticle.
    - Interactive Before/After image comparison with split slider and AI bounding-box inspection overlays.
    - Live Mermaid flowchart rendering with SVG export, active recall quiz with answer reveals, and flashcard flip modes.
-   - Collected and curated our 40-board benchmark dataset.
+   - Includes illustrative sample boards for exploring the interface; these are not evaluation data.
 
 2. **Backend API & Agent Orchestration (Ammar)**:
    - Node.js & Express REST API with MongoDB storage.
-   - Autonomous pipeline runner with quality-gate validation (rejecting low-contrast/blurry uploads and requesting polite retakes).
-   - RAG chat controller and Markdown/PDF export engine.
+   - Pipeline runner with a sharpness-based quality gate and asynchronous job status.
+   - Board-context chat controller and Markdown export.
 
 3. **Computer Vision & Graph Synthesis (Muavia)**:
    - OpenCV cleanup pipeline: 4-corner quad detection, `warpPerspective`, and specular highlight reduction.
-   - PyTorch object detector fine-tuned on 5 whiteboard classes: `text`, `box`, `circle`, `arrow`, and `table`.
-   - Spatial Graph Builder: Geometric vector association matching arrow heads/tails to closest bounding boxes to compile clean Mermaid flowchart ASTs.
+   - Integrates a configurable hosted Roboflow detection workflow; this repository does not include project-trained detector weights.
+   - Spatial heuristics associate arrows and shapes; full-board OCR transcripts are currently represented as sequential Mermaid nodes.
 
 4. **Language Layer, Grounding & Evaluation (Awais)**:
-   - TrOCR handwriting engine benchmarked against PaddleOCR and Tesseract.
-   - Strictly grounded LLM prompts enforcing 100% lexical fidelity to extracted board tokens (eliminating hallucinations).
-   - Vector indexing and retrieval via LangChain for conversational board search.
+   - Integrates a configurable hosted OCR workflow with an EasyOCR fallback; TrOCR is used by a standalone benchmark helper, not the live OCR route.
+   - Prompts the selected LLM provider to use supplied board evidence; outputs can still be incorrect and should be reviewed.
+   - Chat receives the current board context directly; vector-database retrieval is not implemented.
 
 ---
 
-## Why BoardSnap is NOT a Thin API Wrapper
-Hackathon judges penalize thin wrappers. BoardSnap includes three core ML/CV components we trained, implemented, and evaluated ourselves:
-1. **A fine-tuned shape & region detector** distinguishing text blocks from flowchart elements.
-2. **A custom spatial graph builder** resolving directional relationships between shapes and arrows.
-3. **An empirical evaluation on 40 real whiteboard photos** with real numbers on precision, recall, and grounding.
-
----
-
-## Results & Empirical Evaluation
-
-Across our proprietary dataset of **40 whiteboard photos** (10 from each teammate, with **15 held-out test photos** never used in training):
-
-| Metric | Result | Benchmark Target |
-| :--- | :--- | :--- |
-| **Region Detector mAP@0.5** | **88.3%** | >80.0% |
-| **Text Region Precision / Recall** | **92.4% / 90.8%** | >85.0% |
-| **Shape & Box Precision / Recall** | **89.1% / 87.5%** | >80.0% |
-| **Connector Arrow Precision / Recall** | **84.7% / 81.2%** | >80.0% |
-| **Handwriting OCR Word Accuracy** | **86.4%** (TrOCR + Lexicon) | >80.0% |
-| **Flowchart Node Rebuilt Recall** | **93.3%** (56/60 nodes) | >90.0% |
-| **Flowchart Edge Association Accuracy** | **88.0%** (44/50 edges) | >80.0% |
-| **Note Hallucinations (20 boards reviewed)** | **0.0%** (0 invented facts) | 0.0% |
-| **Average End-to-End Latency** | **4.8 seconds** | <8.0 seconds |
+## Current Evaluation Status
+The repository does not currently contain a project-trained detector, a labeled
+end-to-end evaluation set, or reproducible evidence for model accuracy,
+hallucination rate, or end-to-end latency. The sample boards are illustrative
+demo content and are not model predictions or benchmark data. No quantitative
+performance results are claimed. See [the evaluation status](./EVALUATION_REPORT.md)
+for the implemented pipeline and requirements for future measurements.
 
 ---
 
 ## Challenges We Overcame
-1. **Extreme Specular Glare**: Whiteboards are glossy and reflect overhead fluorescent lighting and phone camera flashes. We engineered a bilateral filter and adaptive threshold mask to attenuate specular glare without washing out thin marker strokes.
-2. **Ambiguous Arrow Associations**: Arrows drawn freehand often don't touch the box cleanly. Our spatial matcher computes Euclidean distances between arrow endpoints and all bounding box perimeters, resolving the correct source and target nodes with 88% accuracy.
-3. **Preventing LLM Hallucinations**: Standard LLMs often invent facts when reading messy handwriting. Awais designed an explicit lexical verification gate that checks every generated sentence against recognized board tokens, flagging and eliminating unsupported statements.
-4. **Fast Iteration under Hackathon Time Pressure**: By locking our JSON schema API contract within the first hour, Moyeon built the entire React frontend and video assets in parallel while Ammar, Muavia, and Awais developed the ML backend.
+1. **Multi-service integration**: The app coordinates a browser frontend, an Express API, vision endpoints, and a language-model provider.
+2. **Image quality and OCR variability**: Blur, glare, handwriting, and third-party workflow configuration can affect results. The app exposes a quality check, but it is a heuristic rather than a measured OCR-confidence score.
+3. **Diagram reconstruction**: Spatial association is heuristic; full-board transcript lines currently become sequential nodes rather than a verified reconstruction of every drawn relationship.
 
 ---
 
 ## What We Learned
-- Synthetic data generation with randomized arrows and noise augmentations significantly boosts detector recall for edge cases.
-- Grounding prompts with structured JSON schemas outperform free-text prompting by orders of magnitude for educational study material.
-- Clean user experience—especially instant side-by-side verification and clear rejection explanations—builds high user trust.
+- Keeping service boundaries explicit makes the pipeline easier to configure and test.
+- Structured JSON prompts simplify integrating language-model responses with the user interface.
+- Generated notes and chat answers need user review; grounding instructions alone do not prove factual accuracy.
 
 ---
 
@@ -97,12 +80,12 @@ Across our proprietary dataset of **40 whiteboard photos** (10 from each teammat
 
 ## Built With
 - **Frontend:** React 18, Tailwind CSS, Vite, Lucide Icons, Mermaid.js
-- **Vision & ML:** Python, OpenCV, PyTorch, TrOCR, YOLOv8
+- **Vision & ML:** Python, OpenCV, EasyOCR, configurable Roboflow workflows; TrOCR benchmark helper
 - **Backend & Agent:** Node.js, Express, Multer, MongoDB
-- **Language & RAG:** LangChain, OpenAI / Gemini API, ChromaDB / In-Memory Vector Store
+- **Language:** Gemini, xAI Grok, or Groq API through a configurable provider
 
 ---
 
 ## Links
 - **Demo Video:** [https://youtube.com/watch?v=boardsnap-demo](https://youtube.com/watch?v=boardsnap-demo) (Under 3 minutes, 2:40 target)
-- **GitHub Repository:** [https://github.com/ammar-team/boardsnap](https://github.com/ammar-team/boardsnap)
+- **GitHub Repository:** [https://github.com/Muavia-Ateeq/Boardsnap_project](https://github.com/Muavia-Ateeq/Boardsnap_project)

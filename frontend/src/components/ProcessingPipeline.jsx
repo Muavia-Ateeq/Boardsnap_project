@@ -26,7 +26,7 @@ const PIPELINE_STEPS = [
   {
     step: 4,
     title: "4. Handwriting OCR",
-    owner: "Hugging Face TrOCR",
+    owner: "Roboflow OCR / EasyOCR",
     icon: FileText,
     detail: "Recognizes text from detected crops; handwriting accuracy depends on image and crop quality."
   },

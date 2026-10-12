@@ -35,7 +35,7 @@ export function Navbar({ onOpenEvaluation, isBackendConnected, currentBoard, onS
             }`}
           >
             <span className={`w-2 h-2 rounded-full border border-ink ${isBackendConnected ? 'bg-vine-500 animate-pulse' : 'bg-banana-500'}`} />
-            <span>{isBackendConnected ? 'API: LIVE' : 'API: READY'}</span>
+            <span>{isBackendConnected ? 'API: LIVE' : 'API: DEMO MODE'}</span>
           </div>
 
           {/* Benchmark / Evaluation Modal Button */}
@@ -44,8 +44,8 @@ export function Navbar({ onOpenEvaluation, isBackendConnected, currentBoard, onS
             className="retro-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-banana-100 text-ink cursor-pointer"
           >
             <BarChart2 className="w-3.5 h-3.5 text-ink" />
-            <span className="hidden sm:inline">Benchmark & Metrics</span>
-            <span className="sm:hidden">40-Board Metrics</span>
+            <span className="hidden sm:inline">How It Works</span>
+            <span className="sm:hidden">Project Info</span>
           </button>
 
           {/* Team Tag */}

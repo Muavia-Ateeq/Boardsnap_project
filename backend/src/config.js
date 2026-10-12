@@ -21,5 +21,6 @@ export const config = {
   maxUploadBytes: positiveInteger('MAX_UPLOAD_BYTES', 10 * 1024 * 1024),
   mongodbUri: process.env.MONGODB_URI || '',
   mongodbDatabase: process.env.MONGODB_DATABASE || 'boardsnap',
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173',
   uploadDir: path.resolve(process.env.UPLOAD_DIR || path.join(backendRoot, 'uploads')),
 };

@@ -15,7 +15,7 @@ export function QualityRejectModal({ board, onRetake, onTryClearSample }) {
             <div className="flex items-center gap-2">
               <h3 className="text-xl font-extrabold text-ink font-mono">Photo Rejected: Quality Check Failed</h3>
               <span className="text-xs bg-ripe text-white font-mono font-bold px-2 py-0.5 rounded border border-ink shadow-retro-sm">
-                Score: {(board.quality * 100).toFixed(0)}% (Min: 65%)
+                Score: {(board.quality * 100).toFixed(0)}% (Min: 40%)
               </span>
             </div>
             <p className="text-xs text-ink-muted mt-0.5 font-medium">

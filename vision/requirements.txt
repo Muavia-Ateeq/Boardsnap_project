@@ -15,6 +15,9 @@ pillow>=10.2.0
 # Roboflow Inference API client
 requests>=2.31.0
 
+# Local OCR fallback when the Roboflow OCR workflow is not configured
+easyocr>=1.7.1
+
 # TrOCR – Microsoft handwriting OCR via HuggingFace
 # Models download on first run (~360 MB, cached in ~/.cache/huggingface)
 transformers>=4.38.0

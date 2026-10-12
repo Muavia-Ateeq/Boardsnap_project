@@ -33,7 +33,10 @@ export function createApp({ repository, config }) {
   const pipeline = createBoardPipeline({ repository, config });
 
   app.disable('x-powered-by');
-  app.use(cors());
+  const corsOrigin = config.corsOrigin || '*';
+  app.use(cors({
+    origin: corsOrigin === '*' ? '*' : corsOrigin.split(',').map((origin) => origin.trim()),
+  }));
   app.use(express.json({ limit: '1mb' }));
   app.use('/uploads', express.static(config.uploadDir, { fallthrough: false }));
 

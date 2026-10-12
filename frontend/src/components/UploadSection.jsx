@@ -187,7 +187,7 @@ export function UploadSection({ onProcessBoard, isProcessing }) {
                   Drop your whiteboard photo here
                 </p>
                 <p className="text-xs text-ink-muted mt-1 font-medium">
-                  Supports JPG, PNG, WebP up to 25MB
+                  Supports JPG, PNG, WebP up to 10MB
                 </p>
               </>
             )}
@@ -233,14 +233,14 @@ export function UploadSection({ onProcessBoard, isProcessing }) {
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono font-bold text-ink uppercase tracking-wider">
-                Or test with sample boards
+                Or explore demo boards
               </span>
               <span className="text-[10px] font-mono font-bold bg-white text-ink px-1.5 py-0.5 rounded border border-ink shadow-retro-sm">
-                40 boards
+                Demo examples
               </span>
             </div>
             <p className="text-[11px] text-ink-muted mb-3 font-medium">
-              Click any photo to test the AI pipeline immediately:
+              These illustrative examples show the interface; they are not benchmark results.
             </p>
 
             <div className="space-y-2">

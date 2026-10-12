@@ -1,5 +1,4 @@
-// Realistic sample boards representing the Banana Hacks 40-board evaluation dataset
-// Includes raw (glare/skewed) and cleaned (perspective rectified, contrast boosted) SVGs as data URIs
+// Illustrative demo boards for exploring the interface; these are not benchmark data.
 
 export const sampleBoards = [
   {

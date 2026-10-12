@@ -58,9 +58,9 @@ export function RAGChatSection({ boardId, boardName }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b-2 border-ink/10">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-xl font-extrabold text-ink font-mono">Ask Your Whiteboard (RAG Chat)</h3>
+            <h3 className="text-xl font-extrabold text-ink font-mono">Ask Your Whiteboard</h3>
             <span className="text-xs bg-banana-300 text-ink font-mono font-bold px-2.5 py-0.5 rounded-md border border-ink shadow-retro-sm">
-              Vector RAG Search
+              Board Context Chat
             </span>
           </div>
           <p className="text-xs text-ink-muted mt-0.5 font-medium">

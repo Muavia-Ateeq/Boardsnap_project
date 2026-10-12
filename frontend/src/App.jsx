@@ -139,7 +139,7 @@ export default function App() {
               />
             )}
 
-            {/* 5. RAG Chat over Board */}
+            {/* 5. Chat using the current board context */}
             <RAGChatSection
               boardId={currentBoard.id}
               boardName={currentBoard.name}
@@ -172,7 +172,7 @@ export default function App() {
               onClick={() => setIsEvaluationOpen(true)}
               className="retro-btn bg-white hover:bg-banana-200 px-3 py-1 rounded text-ink font-bold cursor-pointer"
             >
-              40-Photo Evaluation Table
+              How BoardSnap Works
             </button>
           </div>
         </div>

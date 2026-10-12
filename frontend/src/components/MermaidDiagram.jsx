@@ -155,10 +155,6 @@ export function MermaidDiagram({ diagram }) {
           <span><strong>{diagram.nodes.length}</strong> Nodes</span>
           <span>&bull;</span>
           <span><strong>{diagram.edges?.length || 0}</strong> Directed Edges</span>
-          <span>&bull;</span>
-          <span className="text-ink font-bold bg-banana-200 px-2 py-0.5 rounded border border-ink">
-            Arrow attachment accuracy: 88.0%
-          </span>
         </div>
       )}
     </div>

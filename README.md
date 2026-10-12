@@ -1,3 +1,12 @@
+---
+title: BoardSnap Backend
+emoji: 🍌
+colorFrom: yellow
+colorTo: green
+sdk: docker
+app_port: 7860
+---
+
 # BoardSnap 📸✨
 > **Snap a whiteboard. Get clean notes, a redrawn diagram, and a quiz.**
 
@@ -6,7 +15,7 @@
 [![Frontend](https://img.shields.io/badge/Frontend-React%20%7C%20Tailwind-emerald.svg)](./frontend)
 [![Backend](https://img.shields.io/badge/Backend-Node.js%20%7C%20Express-teal.svg)](./backend)
 [![Vision](https://img.shields.io/badge/Vision-OpenCV%20%7C%20PyTorch-orange.svg)](./vision)
-[![LLM](https://img.shields.io/badge/Language-LangChain%20%7C%20RAG-purple.svg)](./llm)
+[![LLM](https://img.shields.io/badge/Language-LLM%20API-purple.svg)](./llm)
 
 **Team:** Ammar, Muavia, Moyeon, Awais  
 **Event:** Banana Hacks 2026 (Devpost, Oct 9 – Oct 12, 2026)  
@@ -25,8 +34,8 @@ BoardSnap turns raw whiteboard photos into:
 1. **Perspective-rectified, glare-attenuated clean imagery**.
 2. **AI-detected regions** separating handwritten text blocks from flowchart shapes.
 3. **Editable Mermaid vector diagrams** with SVG export.
-4. **Strictly grounded study notes** (Key Points, Definitions, Action Items) with zero hallucinations.
-5. **Interactive active recall quizzes, flashcards**, and a conversational RAG store.
+4. **LLM-generated study notes** (Key Points, Definitions, Action Items) based on extracted board content; verify generated results.
+5. **Interactive quizzes, flashcards**, and board-context chat.
 
 ---
 
@@ -35,7 +44,7 @@ BoardSnap turns raw whiteboard photos into:
 boardsnap/
 ├── frontend/           # React + Tailwind CSS + Mermaid + Lucide UI (Moyeon)
 │   ├── src/
-│   │   ├── components/ # Comparison slider, diagram viewer, quiz, RAG chat
+│   │   ├── components/ # Comparison slider, diagram viewer, quiz, board-context chat
 │   │   ├── data/       # Sample benchmark boards (Architecture, ML, Glare test)
 │   │   └── utils/      # API client & simulation fallback
 │   └── package.json
@@ -47,10 +56,10 @@ boardsnap/
 │   └── package.json
 │
 ├── vision/             # Computer Vision & ML services (Muavia)
-│   ├── main.py         # OpenCV cleanup, Roboflow detection, TrOCR & spatial graph builder
+│   ├── main.py         # OpenCV cleanup, hosted Roboflow detection/OCR, EasyOCR fallback & graph builder
 │   └── requirements.txt
 │
-├── llm/                # Grounded language & RAG services (Awais)
+├── llm/                # Language-model API service (Awais)
 │   ├── main.py         # Strict note synthesis, quiz generation & vector chat
 │   └── requirements.txt
 │
@@ -66,6 +75,9 @@ boardsnap/
 ---
 
 ## 🚀 Quick Start & How to Run
+
+For Hugging Face backend and Vercel frontend deployment, follow the
+[beginner deployment guide](./docs/DEPLOYMENT.md).
 
 ### 1. Run the Frontend (React + Vite)
 ```bash
@@ -104,16 +116,16 @@ python -m uvicorn main:app --port 8000 --reload
 ```
 
 The Python virtual environment keeps ML packages isolated from other project
-work. TrOCR downloads its pretrained weights from Hugging Face on first
-inference. In `vision/.env`, set `ROBOFLOW_API_KEY` and paste the complete
+work. The live OCR endpoint uses the configured Roboflow OCR workflow, or
+EasyOCR when that workflow is not configured. TrOCR is used by the standalone
+benchmark helper. In `vision/.env`, set `ROBOFLOW_API_KEY` and paste the complete
 inference URL for the region-detection workflow into `ROBOFLOW_WORKFLOW_URL`.
 The Qwen-VL OCR workflow is configured by default at
 `https://serverless.roboflow.com/moyeon-abrar/workflows/qwen-vl`; override it
 with `ROBOFLOW_OCR_WORKFLOW_URL` if needed. Both workflows use the same
 `ROBOFLOW_API_KEY`. `ROBOFLOW_MODEL_ID` is only a detector log label. The
 service does not contain trained project YOLO weights. When the Roboflow key
-is not configured, OCR continues to use the existing local OCR path. TrOCR
-processes detected text blocks one line at a time. When configured, Qwen-VL
+is not configured, OCR uses the existing EasyOCR local path. When configured, Qwen-VL
 receives the full cleaned board once (not detector-limited crops), and its
 transcription is passed to notes generation and converted into a top-to-bottom
 flowchart using each non-empty transcript line as a sequential step. To select the smaller
@@ -156,7 +168,9 @@ pip install -r requirements.txt
 uvicorn main:app --port 8001 --reload
 ```
 
-The language service supports Gemini, xAI Grok, and GroqCloud. For GroqCloud's
+The language service supports Gemini, xAI Grok, and GroqCloud. Chat sends the
+current board's OCR, diagram, and notes as context to the selected provider; it
+does not currently use a vector database. For GroqCloud's
 free plan (subject to rate limits), set `LLM_PROVIDER=groq` and `GROQ_API_KEY`;
 `GROQ_MODEL` defaults to `openai/gpt-oss-120b`. Alternatively, use
 `LLM_PROVIDER=gemini` with `GEMINI_API_KEY`, or `LLM_PROVIDER=grok` with
@@ -207,8 +221,8 @@ using them as benchmark results.
 ## 👥 Team Split & Credits
 - **Moyeon**: Frontend Lead, UI/UX, Camera integration, Test Data curation & Demo Video.
 - **Ammar**: Backend Lead, Pipeline Orchestrator, REST API, Deck & Submission lead.
-- **Muavia**: Vision & ML Lead, OpenCV cleanup, PyTorch detector fine-tuning, Graph builder.
-- **Awais**: Language & RAG Lead, Grounded prompt engineering, Quiz generation, Quality review.
+- **Muavia**: Vision & ML Lead, OpenCV cleanup, hosted detection/OCR workflow integration, Graph builder.
+- **Awais**: Language-model integration, prompt engineering, Quiz generation, Quality review.
 
 ---
 *Created for Banana Hacks 2026. All code and datasets created during the hackathon period (Oct 9–12, 2026).*

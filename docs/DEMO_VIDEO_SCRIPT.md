@@ -18,7 +18,7 @@
 - **Speaker:** Ammar (Voiceover)
 - **Visual:** Quick cuts of GitHub commits, architecture sketch, and team task board showing Ammar, Muavia, Moyeon, and Awais.
 - **Audio:**  
-  *"I’m Ammar. For Banana Hacks, we wanted to build something that isn't just another thin API wrapper. Pure LLMs hallucinate whiteboard text and can't understand spatial arrows. So we split the engineering: Muavia built our OpenCV cleanup and fine-tuned a custom shape detector in PyTorch; Awais built our strictly grounded LLM pipeline and RAG index; Moyeon engineered our high-speed React app and gathered our 40-board test dataset; and I architected the agentic orchestration API."*
+  *"I’m Ammar. For Banana Hacks, we split the engineering across the React workspace, an Express orchestration API, OpenCV image cleanup, configurable Roboflow vision workflows, and a language-model service. The pipeline turns an uploaded board into reviewable OCR output, a heuristic diagram, draft notes, and quiz questions."*
 
 ---
 
@@ -29,15 +29,15 @@
   - **[0:50 - 1:05] Upload & Autonomous Quality Check**:  
     *Moyeon drags in a messy whiteboard photo. Show the 6-stage autonomous pipeline ticker running.*  
     *"Watch what happens when Moyeon uploads this raw, skewed architecture board. In under 5 seconds, our OpenCV pipeline rectifies perspective, filters specular glare, and runs a quality check. If a photo is too blurry, BoardSnap stops early and politely requests a retake."*
-  - **[1:05 - 1:20] Region Detection & Diagram Rebuilding**:  
-    *Moyeon toggles the 'Show Regions' overlay on the side-by-side view, showing bounding boxes around text and arrows. Then scroll to the rebuilt Mermaid flowchart.*  
-    *"Look at the side-by-side: our custom detector separates text blocks from shapes and arrows. Our graph builder connects arrow paths to boxes and reconstructs the flowchart into an editable, interactive Mermaid diagram that you can copy or export as SVG."*
-  - **[1:20 - 1:38] Grounded Notes & Export**:  
-    *Scroll to Structured Notes: Title, Key Takeaways, Definitions, and Action Items. Click 'Copy Markdown' and show '100% Grounded' badge.*  
-    *"Next, our grounded language layer turns the extracted board into structured study notes—complete with key concepts, definitions, and action items. Every single line is verified against extracted board text—zero hallucinations."*
-  - **[1:38 - 1:50] Active Recall Quiz & RAG Chat**:  
-    *Moyeon clicks option B on Question 1—it turns green with explanation revealed. Switch to Flashcard mode. Type 'What did we decide about the DLQ?' in RAG chat.*  
-    *"Finally, BoardSnap generates active recall quiz questions and flashcards. You can even chat with your board using our RAG store to query past decisions with exact citations."*
+  - **[1:05 - 1:20] Region Detection & Diagram Rebuilding**:
+    *Moyeon toggles the 'Show Regions' overlay on the side-by-side view, showing detected regions. Then scroll to the generated Mermaid flowchart.*
+    *"The configured vision workflow proposes regions. Our graph builder uses spatial heuristics to create a Mermaid diagram that you can copy or export as SVG."*
+  - **[1:20 - 1:38] Grounded Notes & Export**:
+    *Scroll to Structured Notes: Title, Key Takeaways, Definitions, and Action Items. Click 'Copy Markdown'.*
+    *"Next, our language layer drafts structured notes from the extracted board content. AI output can be imperfect, so the app clearly asks users to review it."*
+  - **[1:38 - 1:50] Active Recall Quiz & Board Chat**:
+    *Moyeon clicks an answer, switches to Flashcard mode, and asks a question about the current board.*
+    *"Finally, BoardSnap generates quiz questions and flashcards. You can also ask a question with the current board content supplied as context."*
 
 ---
 
@@ -45,9 +45,9 @@
 - **Speaker:** Muavia & Awais
 - **Visual:** Pipeline architecture graphic, followed by the Evaluation Table from `docs/EVALUATION_REPORT.md` shown on screen.
 - **Muavia [1:50 - 2:05]:**  
-  *"Under the hood, we trained our region detector on whiteboard primitives, achieving 88.1% macro precision across 288 test shapes. For OCR, we benchmarked Tesseract against PaddleOCR and TrOCR, achieving 86.4% word accuracy with our contextual lexicon filter. Our spatial graph builder successfully linked 88% of flowchart arrows."*
+  *"Under the hood, OpenCV cleans and scores the image, configured Roboflow workflows provide detection and OCR, and a spatial heuristic builds a Mermaid diagram. We have not yet published verified model-accuracy measurements, so we describe these as implementation capabilities rather than benchmark results."*
 - **Awais [2:05 - 2:20]:**  
-  *"On the language side, we reviewed 20 boards line-by-line and verified a 0% hallucination rate because the model is strictly constrained to extracted tokens. Across our 40 real-world board photos gathered across the team, average end-to-end processing time was just 4.8 seconds."*
+  *"The language service uses the current board as context for notes, quizzes, and chat. Its prompts request evidence-based output, but generated answers still need human review. Our bundled sample boards are interface demos, not evaluation data."*
 
 ---
 
